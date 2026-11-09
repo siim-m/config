@@ -1,0 +1,62 @@
+{
+  "name": "@siim-m/config",
+  "version": "0.1.0",
+  "description": "Shared oxlint, oxfmt and tsconfig settings, with the anti-slop oxlint plugins",
+  "license": "MIT",
+  "repository": "github:siim-m/config",
+  "files": [
+    "dist",
+    "reset.d.ts",
+    "tsconfig.base.json"
+  ],
+  "type": "module",
+  "exports": {
+    "./oxlint": "./dist/oxlint.js",
+    "./oxfmt": "./dist/oxfmt.js",
+    "./anti-slop": "./dist/anti-slop/index.js",
+    "./anti-slop-effect": "./dist/anti-slop/effect/index.js",
+    "./tsconfig.json": "./tsconfig.base.json",
+    "./reset.d.ts": "./reset.d.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/anti-slop/LICENSE dist/anti-slop/ && cp src/anti-slop/vendor/eslint-stylistic/LICENSE src/anti-slop/vendor/eslint-stylistic/padding-line-options.d.ts dist/anti-slop/vendor/eslint-stylistic/",
+    "typecheck": "tsc --noEmit",
+    "test": "bun run build && node --test 'src/**/*.test.ts' 'test/*.test.ts'",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "check": "bun run typecheck && bun run test && bun run format:check",
+    "prepublishOnly": "bun run check"
+  },
+  "dependencies": {
+    "@oxlint/plugins": "^1.92.0",
+    "@total-typescript/ts-reset": "^0.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "@effect/tsgo": ">=0.67.5",
+    "oxfmt": ">=0.77.0",
+    "oxlint": ">=1.92.0",
+    "oxlint-tsgolint": ">=7.0.2006"
+  },
+  "peerDependenciesMeta": {
+    "@effect/tsgo": {
+      "optional": true
+    },
+    "oxfmt": {
+      "optional": true
+    },
+    "oxlint-tsgolint": {
+      "optional": true
+    }
+  },
+  "packageManager": "bun@1.4.4"
+}
