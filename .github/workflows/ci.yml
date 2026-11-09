@@ -49,5 +49,12 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Check the tag matches package.json
         run: test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')"
+      # The first version was published by hand, and a re-run tag shouldn't fail.
+      - name: Check npm doesn't have this version yet
+        id: npm
+        run: |
+          published=$(npm view "$(node -p 'require("./package.json").name')@${GITHUB_REF_NAME#v}" version 2>/dev/null || true)
+          echo "published=$published" >> "$GITHUB_OUTPUT"
       # prepublishOnly runs the checks and builds dist/.
-      - run: npm publish
+      - if: steps.npm.outputs.published == ''
+        run: npm publish
