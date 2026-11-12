@@ -51,6 +51,37 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
   assert.equal(rules.has('test/fixture/clean.ts'), false, output);
 });
 
+test('the React preset adds its plugins and rules on top of the base', () => {
+  const { status, output } = run('oxlint', [
+    '--type-aware',
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint-react.config.mts',
+    'test/fixture/react-violations.tsx',
+    'test/fixture/react-clean.tsx',
+    'test/fixture/react-clean.ts',
+  ]);
+
+  assert.equal(status, 1, output);
+  const rules = reportedRules(output);
+  // One rule from each plugin the preset loads, rules-of-hooks (outside the correctness
+  // category), each anti-slop-react rule, and the .tsx-only number check.
+  assert.deepEqual(
+    rules.get('test/fixture/react-violations.tsx'),
+    [
+      'anti-slop-react(no-hookless-use-function)',
+      'anti-slop-react(no-manual-memo)',
+      'anti-slop-react(require-sync-comment-for-effect)',
+      'jsx-a11y(alt-text)',
+      'react-hooks(rules-of-hooks)',
+      'typescript(strict-boolean-expressions)',
+    ],
+    output
+  );
+  assert.equal(rules.has('test/fixture/react-clean.tsx'), false, output);
+  assert.equal(rules.has('test/fixture/react-clean.ts'), false, output);
+});
+
 test('the oxfmt settings load', () => {
   // clean.ts uses single quotes, which oxfmt's defaults would rewrite.
   const { status, output } = run('oxfmt', [
