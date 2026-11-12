@@ -22,18 +22,6 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 - `effect/rules/no-service-parameters.ts` and `effect/baseline.ts`, with `exempt` and `baseline`
   options.
 
-- `react/`, the `anti-slop-react` plugin. Its rules come from
-  [T3 Code](https://github.com/pingdotgg/t3code)'s `oxlint-plugin-t3code` at `2de3370`
-  (2026-11-12), MIT; `react/LICENSE` is T3 Code's:
-  - `no-manual-memo`, without T3's `allowMemoHooks` option, and without its message's pointer
-    to T3's own `useStableCallback`.
-  - `no-hookless-use-function`, rewritten to track hook calls through oxlint's traversal
-    instead of walking each function's body.
-  - `require-sync-comment-for-effect`, adapted from `no-unreasoned-state-sync`. T3 asks for a
-    disable comment with a reason; this asks for a `SYNC:` comment, as
-    `require-safety-comment-for-type-assertion` asks for `SAFETY:`, so it needs no rule that
-    checks disable comments. It also checks test files.
-
 ## Changed upstream files
 
 - `index.ts` and `effect/index.ts`: register the rules above, drop the deleted ones.

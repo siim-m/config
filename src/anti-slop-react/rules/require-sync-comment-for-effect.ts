@@ -2,16 +2,13 @@ import { defineRule } from '@oxlint/plugins';
 import type { ESTree } from '@oxlint/plugins';
 
 const EFFECT_HOOKS = new Set(['useEffect', 'useLayoutEffect', 'useInsertionEffect']);
-const EFFECT_HOOK_TEXT = /use(?:Layout|Insertion)?Effect/;
 const SYNC_COMMENT = /(?:^|[^\p{L}\p{N}_])SYNC\s*:\s*\S/u;
 const statementKinds = new Set(['ExpressionStatement', 'ReturnStatement', 'VariableDeclaration']);
 
 function isEffectHookCall(callee: ESTree.Expression): boolean {
   if (callee.type === 'Identifier') return EFFECT_HOOKS.has(callee.name);
   return (
-    callee.type === 'MemberExpression' &&
-    !callee.computed &&
-    EFFECT_HOOKS.has(callee.property.name)
+    callee.type === 'MemberExpression' && !callee.computed && EFFECT_HOOKS.has(callee.property.name)
   );
 }
 
@@ -45,21 +42,28 @@ export const requireSyncCommentForEffectRule = defineRule({
     },
   },
   createOnce(context) {
-    /** A SYNC comment before the call, or before any node between it and its statement. */
+    const hasSyncCommentBefore = (node: ESTree.Node): boolean =>
+      context.sourceCode.getCommentsBefore(node).some((c) => SYNC_COMMENT.test(c.value));
+
+    /**
+     * A SYNC comment before the call, before any node between it and its statement, or before
+     * the `export` that declares that statement.
+     */
     const hasSyncComment = (node: ESTree.CallExpression): boolean => {
       let current: ESTree.Node = node;
       while (true) {
-        if (context.sourceCode.getCommentsBefore(current).some((c) => SYNC_COMMENT.test(c.value))) {
-          return true;
+        if (hasSyncCommentBefore(current)) return true;
+        if (statementKinds.has(current.type)) {
+          return (
+            current.parent.type === 'ExportNamedDeclaration' && hasSyncCommentBefore(current.parent)
+          );
         }
-        if (statementKinds.has(current.type) || current.parent.type === 'Program') return false;
+        if (current.parent.type === 'Program') return false;
         current = current.parent;
       }
     };
 
     return {
-      // A file that never names an effect hook can't call one.
-      before: () => EFFECT_HOOK_TEXT.test(context.sourceCode.text),
       CallExpression(node) {
         if (!isEffectHookCall(node.callee) || hasSyncComment(node)) return;
         context.report({ node, messageId: 'missingSyncComment' });

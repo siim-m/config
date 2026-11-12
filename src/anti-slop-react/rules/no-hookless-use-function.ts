@@ -10,9 +10,7 @@ type FunctionNode = ESTree.Function | ESTree.ArrowFunctionExpression;
 function isHookCall(callee: ESTree.Expression): boolean {
   if (callee.type === 'Identifier') return HOOK_CALLEE.test(callee.name);
   return (
-    callee.type === 'MemberExpression' &&
-    !callee.computed &&
-    HOOK_CALLEE.test(callee.property.name)
+    callee.type === 'MemberExpression' && !callee.computed && HOOK_CALLEE.test(callee.property.name)
   );
 }
 
@@ -20,7 +18,11 @@ function isHookCall(callee: ESTree.Expression): boolean {
 function functionName(node: FunctionNode): ESTree.BindingIdentifier | undefined {
   if (node.type === 'FunctionDeclaration') return node.id ?? undefined;
   const parent = node.parent;
-  if (parent.type === 'VariableDeclarator' && parent.init === node && parent.id.type === 'Identifier') {
+  if (
+    parent.type === 'VariableDeclarator' &&
+    parent.init === node &&
+    parent.id.type === 'Identifier'
+  ) {
     return parent.id;
   }
   return undefined;

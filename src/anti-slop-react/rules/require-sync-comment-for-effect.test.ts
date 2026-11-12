@@ -22,6 +22,8 @@ tester.run('anti-slop-react/require-sync-comment-for-effect', requireSyncComment
       // SYNC: the window's resize events.
       return useEffect(() => {}, []);
     };`,
+    `// SYNC: the window's resize events.
+    export const useResize = () => useEffect(() => {}, []);`,
     // Mentions of the hooks that are not calls.
     `// useEffect(() => {}) in a comment
     const label = 'useEffect(() => {})';

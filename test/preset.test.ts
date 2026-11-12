@@ -59,7 +59,7 @@ test('the React preset adds its plugins and rules on top of the base', () => {
     'test/fixture/oxlint-react.config.mts',
     'test/fixture/react-violations.tsx',
     'test/fixture/react-clean.tsx',
-    'test/fixture/clean.ts',
+    'test/fixture/react-clean.ts',
   ]);
 
   assert.equal(status, 1, output);
@@ -79,8 +79,7 @@ test('the React preset adds its plugins and rules on top of the base', () => {
     output
   );
   assert.equal(rules.has('test/fixture/react-clean.tsx'), false, output);
-  // clean.ts tests a number as a condition, which the preset allows outside .tsx files.
-  assert.equal(rules.has('test/fixture/clean.ts'), false, output);
+  assert.equal(rules.has('test/fixture/react-clean.ts'), false, output);
 });
 
 test('the oxfmt settings load', () => {

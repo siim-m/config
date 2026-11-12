@@ -47,7 +47,11 @@ export const noManualMemoRule = defineRule({
         if (node.directive === 'use memo') {
           context.report({ node, messageId: 'useMemoDirective' });
         } else if (typeof node.directive === 'string' && OPT_OUT_DIRECTIVES.has(node.directive)) {
-          context.report({ node, messageId: 'optOutDirective', data: { directive: node.directive } });
+          context.report({
+            node,
+            messageId: 'optOutDirective',
+            data: { directive: node.directive },
+          });
         }
       },
       CallExpression(node) {

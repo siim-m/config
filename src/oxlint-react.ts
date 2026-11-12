@@ -49,7 +49,8 @@ const preset = {
   overrides: [
     {
       // `{count && <p />}` renders "0". Optional booleans and strings render nothing when
-      // falsy, so only numbers are checked. Type-aware.
+      // falsy, so they may be conditions; numbers, nullable numbers and `any` may not, in any
+      // condition in a .tsx file. Type-aware.
       files: ['**/*.tsx'],
       rules: {
         'typescript/strict-boolean-expressions': [

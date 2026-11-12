@@ -16,7 +16,7 @@
     "./oxfmt": "./dist/oxfmt.js",
     "./anti-slop": "./dist/anti-slop/index.js",
     "./anti-slop-effect": "./dist/anti-slop/effect/index.js",
-    "./anti-slop-react": "./dist/anti-slop/react/index.js",
+    "./anti-slop-react": "./dist/anti-slop-react/index.js",
     "./tsconfig.json": "./tsconfig.base.json",
     "./reset.d.ts": "./reset.d.ts"
   },
@@ -24,7 +24,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/anti-slop/LICENSE dist/anti-slop/ && cp src/anti-slop/react/LICENSE dist/anti-slop/react/ && cp src/anti-slop/vendor/eslint-stylistic/LICENSE src/anti-slop/vendor/eslint-stylistic/padding-line-options.d.ts dist/anti-slop/vendor/eslint-stylistic/",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/anti-slop/LICENSE dist/anti-slop/ && cp src/anti-slop-react/LICENSE dist/anti-slop-react/ && cp src/anti-slop/vendor/eslint-stylistic/LICENSE src/anti-slop/vendor/eslint-stylistic/padding-line-options.d.ts dist/anti-slop/vendor/eslint-stylistic/",
     "typecheck": "tsc --noEmit",
     "test": "bun run build && node --test 'src/**/*.test.ts' 'test/*.test.ts'",
     "format": "oxfmt",
