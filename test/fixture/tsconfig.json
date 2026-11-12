@@ -4,8 +4,9 @@
     "target": "ES2022",
     "module": "preserve",
     "moduleResolution": "bundler",
+    "jsx": "react-jsx",
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "*.tsx"]
 }
