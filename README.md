@@ -54,4 +54,5 @@ In `.tsx` files a number can't be a condition, because `{count && <p />}` render
 ## License
 
 MIT. The anti-slop rules are MIT, copyright Dillon Mulroy; `require-readable-spacing` uses MIT code
-from ESLint Stylistic. The `anti-slop-react` rules are MIT, copyright T3 Tools Inc.
+from ESLint Stylistic. The `anti-slop-react` rules are MIT, copyright T3 Tools Inc.: rewritten from
+T3 Code's `oxlint-plugin-t3code` at `2de3370`, and not kept in step with it.

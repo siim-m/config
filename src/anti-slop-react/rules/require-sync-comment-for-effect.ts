@@ -17,7 +17,7 @@ function isEffectHookCall(callee: ESTree.Expression): boolean {
  * `useInsertionEffect`, naming what outside React the effect keeps in step. Most effects
  * should be a derivation during render or an event handler instead, and the message walks
  * through those first. Adapted from T3 Code's `no-unreasoned-state-sync`, which asks for a
- * disable comment with a reason instead.
+ * disable comment with a reason instead, and skips test files.
  */
 export const requireSyncCommentForEffectRule = defineRule({
   meta: {

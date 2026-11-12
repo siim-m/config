@@ -23,7 +23,8 @@ function memoHookName(callee: ESTree.Expression): string | undefined {
 /**
  * Disallow `useMemo`, `useCallback` and the compiler's memo directives. The React Compiler
  * memoizes components and hooks itself, so manual memoization is noise, and a directive
- * hides the code the compiler withheld a cache scope from. Ported from T3 Code.
+ * hides the code the compiler withheld a cache scope from. From T3 Code's rule of the same name,
+ * without its `allowMemoHooks` option.
  */
 export const noManualMemoRule = defineRule({
   meta: {

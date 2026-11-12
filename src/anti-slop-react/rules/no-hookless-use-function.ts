@@ -31,8 +31,9 @@ function functionName(node: FunctionNode): ESTree.BindingIdentifier | undefined 
 /**
  * Disallow `use*` functions that call no hook during their own body. React treats the name as
  * a hook, and the React Compiler only memoizes functions that call one, so whatever a hook-less
- * `use*` function returns is rebuilt on every render. Ported from T3 Code, which mirrors
- * eslint-react's `no-unnecessary-use-prefix`.
+ * `use*` function returns is rebuilt on every render. From T3 Code's rule of the same name,
+ * which mirrors eslint-react's `no-unnecessary-use-prefix`; this one tracks hook calls through
+ * oxlint's traversal instead of walking each function's body.
  */
 export const noHooklessUseFunctionRule = defineRule({
   meta: {
