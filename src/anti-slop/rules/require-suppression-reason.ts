@@ -52,6 +52,7 @@ export const requireSuppressionReasonRule = defineRule({
         }
 
         for (const comment of comments) {
+          if (comment.type === 'Shebang') continue;
           const after = TYPESCRIPT_DIRECTIVE.exec(comment.value)?.[1];
           if (after === undefined || after.replace(/^[\s:-]+/u, '').trim() !== '') continue;
           if (explainedAbove(comment)) continue;

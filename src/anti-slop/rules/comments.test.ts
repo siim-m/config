@@ -88,6 +88,11 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// The CLI prints its result.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
       options: taggedOnly,
     },
+    // A reason above other directives above a suppression still explains it (S12).
+    {
+      code: '// The CLI prints its result.\n// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      options: taggedOnly,
+    },
   ],
   invalid: [
     {
@@ -118,7 +123,10 @@ tester.run('anti-slop/comments', commentsRule, {
     },
     { code: '// ---- Helpers ----\nconst a = 1;', errors: [{ messageId: 'divider' }] },
     { code: '// =========\nconst a = 1;', errors: [{ messageId: 'divider' }] },
-    { code: '// ═══════\n// Time series\n// ═══════\nconst timeSeries = 1;', errors: [{ messageId: 'divider' }] },
+    {
+      code: '// ═══════\n// Time series\n// ═══════\nconst timeSeries = 1;',
+      errors: [{ messageId: 'divider' }],
+    },
     {
       code: '// const old = load();\n// save(old);\nconst a = 1;',
       errors: [{ messageId: 'commentedOutCode' }],
@@ -185,6 +193,28 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// SAFETY: fine.\n// oxlint-disable-next-line no-console -- logs\n// Unrelated chatter.\nconsole.log(1);',
       options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
+    },
+    // Exporting a parameter's namesake or a sibling binding exports nothing else (S11).
+    {
+      code: '/** Waits. */\nfunction delay(retries: number) { return retries; }\nconst retries = 1;\nexport { retries };',
+      options: taggedOnly,
+      errors: [{ messageId: 'untagged' }],
+    },
+    {
+      code: 'const a = {}, b = {\n  /** Hidden. */\n  c: 1,\n};\nexport { a };',
+      options: taggedOnly,
+      errors: [{ messageId: 'untagged' }],
+    },
+    // A trailing comment is not a reason, as require-suppression-reason holds (S12).
+    {
+      code: 'start(); // Starts it.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      options: taggedOnly,
+      errors: [{ messageId: 'untagged' }],
+    },
+    // Enum members are names too (S13).
+    {
+      code: "enum State {\n  /** Ready. */\n  Ready = 'ready',\n}",
+      errors: [{ messageId: 'restatesName' }],
     },
   ],
 });

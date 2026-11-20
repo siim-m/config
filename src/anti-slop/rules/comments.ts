@@ -102,11 +102,8 @@ const isExport = (node: ESTree.Node): boolean =>
   node.type === 'ExportDefaultDeclaration' ||
   node.type === 'ExportAllDeclaration';
 
-/** Top-level statements that export, or declare a binding that `export { name }` or `export default name` exports. */
-function exportedStatements(
-  program: ESTree.Program,
-  sourceCode: SourceCode
-): ReadonlySet<ESTree.Node> {
+/** Top-level statements that export, and declarations of a binding that `export { name }` or `export default name` exports. */
+function exportedStatements(program: ESTree.Program): ReadonlySet<ESTree.Node> {
   const names = new Set<string>();
   for (const statement of program.body) {
     if (
@@ -124,13 +121,45 @@ function exportedStatements(
       names.add(statement.declaration.name);
     }
   }
-  return new Set(
-    program.body.filter(
-      (statement) =>
-        isExport(statement) ||
-        sourceCode.getDeclaredVariables(statement).some((variable) => names.has(variable.name))
-    )
-  );
+  const exported = new Set<ESTree.Node>();
+  for (const statement of program.body) {
+    if (isExport(statement)) {
+      exported.add(statement);
+    } else if (statement.type === 'VariableDeclaration') {
+      for (const declarator of statement.declarations) {
+        if (declarator.id.type === 'Identifier' && names.has(declarator.id.name)) {
+          exported.add(declarator);
+        }
+      }
+    } else if (
+      'id' in statement &&
+      statement.id?.type === 'Identifier' &&
+      names.has(statement.id.name)
+    ) {
+      exported.add(statement);
+    }
+  }
+  return exported;
+}
+
+/** The statement a doc comment for an exported node sits above. */
+const docTarget = (node: ESTree.Node): ESTree.Node =>
+  node.type === 'VariableDeclarator' && node.parent !== null ? node.parent : node;
+
+/**
+ * Whether a suppression directive follows a comment group on the next lines, past other
+ * directives, so the group is its reason, as `require-suppression-reason` reads it.
+ */
+function suppressionFollows(groups: readonly (readonly Comment[])[], index: number): boolean {
+  let line = groups[index]?.at(-1)?.loc.end.line ?? 0;
+  for (const group of groups.slice(index + 1)) {
+    const [comment] = group;
+    if (comment === undefined || comment.loc.start.line !== line + 1 || !isDirective(comment))
+      return false;
+    if (SUPPRESSION.test(comment.value)) return true;
+    line = comment.loc.end.line;
+  }
+  return false;
 }
 
 const FUNCTIONS: ReadonlySet<string> = new Set([
@@ -151,9 +180,9 @@ function isExposedMember(member: ESTree.Node, exported: ReadonlySet<ESTree.Node>
       return false;
     }
     if ('key' in node && node.key.type === 'PrivateIdentifier') return false;
+    if (exported.has(node)) return true;
     const parent: ESTree.Node | null = node.parent;
-    if (parent === null) return false;
-    if (parent.type === 'Program') return exported.has(node);
+    if (parent === null || parent.type === 'Program') return false;
     if (FUNCTIONS.has(parent.type) && 'body' in parent && parent.body === node) return false;
     node = parent;
   }
@@ -243,6 +272,7 @@ export const commentsRule = defineRule({
     const collect = (node: ESTree.Node) => {
       members.push(node);
       if ('key' in node) name(node, node.key);
+      else if ('id' in node) name(node, node.id);
     };
     const declaration = (node: ESTree.Node) => {
       if (node.type === 'VariableDeclaration') name(node, node.declarations[0]?.id);
@@ -325,17 +355,21 @@ export const commentsRule = defineRule({
       ExportNamedDeclaration: exported,
       ExportDefaultDeclaration: exported,
       'Program:exit'(program) {
-        const exportedNodes = exportedStatements(program, sourceCode);
+        const exportedNodes = exportedStatements(program);
         const exportDocs = new Set<number>();
         const addDoc = (node: ESTree.Node) => {
           const doc = docBefore(node, sourceCode);
           if (doc !== undefined) exportDocs.add(doc.start);
         };
-        for (const statement of exportedNodes) addDoc(statement);
+        for (const node of exportedNodes) addDoc(docTarget(node));
         for (const member of members) if (isExposedMember(member, exportedNodes)) addDoc(member);
         const codeStart = program.body[0]?.start ?? sourceCode.text.length;
 
         const groups = commentGroups(sourceCode.getAllComments(), sourceCode.text);
+        const ownLine = (comment: Comment) =>
+          (sourceCode.lines[comment.loc.start.line - 1] ?? '')
+            .slice(0, comment.loc.start.column)
+            .trim() === '';
         for (const [index, group] of groups.entries()) {
           const first = group[0];
           const last = group.at(-1);
@@ -346,11 +380,7 @@ export const commentsRule = defineRule({
             (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
           const lines = group.flatMap(textLines);
           if (licence || lines.length === 0) continue;
-          const next = groups[index + 1]?.[0];
-          const explainsSuppression =
-            next !== undefined &&
-            next.loc.start.line === last.loc.end.line + 1 &&
-            SUPPRESSION.test(next.value);
+          const explainsSuppression = ownLine(first) && suppressionFollows(groups, index);
           const found = problem(
             group,
             lines,

@@ -7,6 +7,7 @@ const typescript = { messageId: 'typescriptDirective' };
 
 tester.run('anti-slop/require-suppression-reason', requireSuppressionReasonRule, {
   valid: [
+    '#!@ts-ignore\nconst a = 1;',
     '// oxlint-disable-next-line no-console -- the CLI prints its result\nconsole.log(1);',
     '/* eslint-disable no-console -- a script */\nconsole.log(1);',
     '// The CLI prints its result.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
