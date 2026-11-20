@@ -21,6 +21,8 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 - `rules/require-pascal-case-namespace-imports.ts`
 - `rules/comments.ts`, from the author's own `comment-budget` rule, with checks adapted from T3 Code's
   `no-low-value-comments` (MIT, T3 Tools Inc.; see `../anti-slop-react/LICENSE`).
+- `rules/require-suppression-reason.ts`, adapted from T3 Code's rule of that name (MIT, T3 Tools
+  Inc.).
 - `effect/rules/no-service-parameters.ts` and `effect/baseline.ts`, with `exempt` and `baseline`
   options.
 
@@ -29,13 +31,14 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 Copied unchanged, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistele/anti-slop)
 at `13b0203` (2026-11-19), MIT:
 
+- `rules/no-disabled-type-assertion-rules.ts`
 - `effect/rules/no-ordie-in-service-construction.ts`
 - `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT).
 - `effect/rules/require-cause-when-narrowing.ts`
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT).
 - `effect/shared/effect-modules.ts`, which the four rules share.
 
-To update them, diff the fork's `src/effect/` from `13b0203`.
+To update them, diff those files in the fork from `13b0203`.
 
 ## Changed upstream files
 

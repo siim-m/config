@@ -39,9 +39,11 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
     rules.get('test/fixture/violations.ts'),
     [
       'anti-slop(comments)',
+      'anti-slop(no-disabled-type-assertion-rules)',
       'anti-slop(no-unknown-parameters)',
       'anti-slop(require-pascal-case-namespace-imports)',
       'anti-slop(require-readable-spacing)',
+      'anti-slop(require-suppression-reason)',
       'anti-slop-effect(prefer-effect-match)',
       'eslint(no-debugger)',
       'typescript(no-floating-promises)',

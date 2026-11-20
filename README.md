@@ -28,6 +28,10 @@ Every rule is on at `error`; a project turns off what it can't pass yet. Run oxl
 `--type-aware`. For ts-reset's stricter built-in types, add `import '@siim-m/config/reset.d.ts';` to
 a `.d.ts` file in the project.
 
+A disable comment or `@ts-expect-error` must say why, after `--` or on the line above
+(`anti-slop/require-suppression-reason`). The type-assertion rules can't be disabled inline at all;
+turn one off for a file in the lint config instead (`anti-slop/no-disabled-type-assertion-rules`).
+
 ## Comments
 
 `anti-slop/comments` holds a comment to a short why. By default a comment gets 30 words, a doc
