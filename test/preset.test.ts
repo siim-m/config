@@ -38,6 +38,7 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
   assert.deepEqual(
     rules.get('test/fixture/violations.ts'),
     [
+      'anti-slop(comments)',
       'anti-slop(no-unknown-parameters)',
       'anti-slop(require-pascal-case-namespace-imports)',
       'anti-slop(require-readable-spacing)',

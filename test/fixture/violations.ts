@@ -19,6 +19,7 @@ export function each(values: number[]): void {
   });
 }
 
+// TODO: remove before release.
 export function pause(): void {
   debugger;
 }

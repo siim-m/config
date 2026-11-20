@@ -19,6 +19,8 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 ## Added
 
 - `rules/require-pascal-case-namespace-imports.ts`
+- `rules/comments.ts`, from the author's own `comment-budget` rule, with checks adapted from T3 Code's
+  `no-low-value-comments` (MIT, T3 Tools Inc.; see `../anti-slop-react/LICENSE`).
 - `effect/rules/no-service-parameters.ts` and `effect/baseline.ts`, with `exempt` and `baseline`
   options.
 
