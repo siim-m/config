@@ -22,6 +22,19 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 - `effect/rules/no-service-parameters.ts` and `effect/baseline.ts`, with `exempt` and `baseline`
   options.
 
+## From Kyle Mistele's fork
+
+Copied unchanged, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistele/anti-slop)
+at `13b0203` (2026-11-19), MIT:
+
+- `effect/rules/no-ordie-in-service-construction.ts`
+- `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT).
+- `effect/rules/require-cause-when-narrowing.ts`
+- `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT).
+- `effect/shared/effect-modules.ts`, which the four rules share.
+
+To update them, diff the fork's `src/effect/` from `13b0203`.
+
 ## Changed upstream files
 
 - `index.ts` and `effect/index.ts`: register the rules above, drop the deleted ones.

@@ -1,5 +1,7 @@
 import type { OxlintConfig } from 'oxlint';
 
+const TEST_FILES = ['**/*.test.*', '**/*.spec.*', '**/test/**', '**/tests/**', '**/__tests__/**'];
+
 /**
  * Shared oxlint preset. Extend it from `oxlint.config.mts`:
  *
@@ -33,15 +35,28 @@ const preset = {
     'anti-slop/require-readable-spacing': 'error',
     'anti-slop/require-safety-comment-for-type-assertion': 'error',
     'anti-slop-effect/no-manual-effect-error-tag': 'error',
+    'anti-slop-effect/no-ordie-in-service-construction': 'error',
     'anti-slop-effect/no-service-constructor-imports': 'error',
     'anti-slop-effect/no-service-parameters': 'error',
+    'anti-slop-effect/no-unbounded-retry': 'error',
     'anti-slop-effect/prefer-effect-match': 'error',
+    'anti-slop-effect/require-cause-when-narrowing': 'error',
+    'anti-slop-effect/throw-in-effect-gen': 'error',
     // Spreads in reducers; anti-slop/no-reduce-accumulator-copy covers the other copies.
     'oxc/no-accumulating-spread': 'error',
     // Type-aware: these run only with `oxlint --type-aware` and oxlint-tsgolint installed.
     'typescript/no-floating-promises': 'error',
     'typescript/no-misused-promises': 'error',
   },
+  overrides: [
+    {
+      files: TEST_FILES,
+      rules: {
+        // A test may throw inside Effect.gen to fail on purpose.
+        'anti-slop-effect/throw-in-effect-gen': 'off',
+      },
+    },
+  ],
 } satisfies OxlintConfig;
 
 export default preset;
