@@ -45,14 +45,15 @@
     "@types/react": "19.3.0",
     "oxfmt": "0.77.0",
     "oxlint": "1.92.0",
-    "oxlint-tsgolint": "7.0.2006",
+    "tsrs": "7.1.0-beta.tsrs3",
     "typescript": "7.0.2"
   },
   "peerDependencies": {
     "@effect/tsgo": ">=0.67.5",
     "oxfmt": ">=0.77.0",
     "oxlint": ">=1.92.0",
-    "oxlint-tsgolint": ">=7.0.2006"
+    "oxlint-tsgolint": ">=7.0.2006",
+    "tsrs": ">=7.1.0-beta.tsrs3"
   },
   "peerDependenciesMeta": {
     "@effect/tsgo": {
@@ -62,6 +63,9 @@
       "optional": true
     },
     "oxlint-tsgolint": {
+      "optional": true
+    },
+    "tsrs": {
       "optional": true
     }
   },

@@ -4,7 +4,7 @@ Shared oxlint, oxfmt and tsconfig settings for TypeScript, with the
 [anti-slop](https://github.com/dmmulroy/anti-slop) oxlint rules.
 
 ```sh
-bun add -d @siim-m/config oxlint oxlint-tsgolint oxfmt
+bun add -d @siim-m/config oxlint tsrs oxfmt
 ```
 
 ```ts
@@ -25,8 +25,11 @@ export default { ...base, singleQuote: false };
 ```
 
 Every rule is on at `error`; a project turns off what it can't pass yet. Run oxlint with
-`--type-aware`. For ts-reset's stricter built-in types, add `import '@siim-m/config/reset.d.ts';` to
-a `.d.ts` file in the project.
+`--type-aware`, which uses [tsrs](https://github.com/oxc-project/tsrs), the Rust port of TypeScript
+7, when it's installed. On spansmith it ran the type-aware rules in 3.2s against 6.9 to 9.9s for
+`oxlint-tsgolint`, with the same findings; `oxlint-tsgolint` still works in its place. tsrs only
+backs the lint rules, so keep the project's own `tsc` or `@effect/tsgo` typecheck. For ts-reset's
+stricter built-in types, add `import '@siim-m/config/reset.d.ts';` to a `.d.ts` file in the project.
 
 A disable comment or `@ts-expect-error` must say why, after `--` or on the line above
 (`anti-slop/require-suppression-reason`). The type-assertion rules can't be disabled inline at all;
