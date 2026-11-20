@@ -47,9 +47,27 @@ const preset = {
     'anti-slop-effect/throw-in-effect-gen': 'error',
     // Spreads in reducers; anti-slop/no-reduce-accumulator-copy covers the other copies.
     'oxc/no-accumulating-spread': 'error',
-    // Type-aware: these run only with `oxlint --type-aware` and oxlint-tsgolint installed.
+    eqeqeq: 'error',
+    'typescript/consistent-type-imports': 'error',
+    'typescript/no-explicit-any': 'error',
+    'typescript/no-non-null-assertion': 'error',
+    // Type-aware: these run only with `oxlint --type-aware` and tsrs or oxlint-tsgolint installed.
     'typescript/no-floating-promises': 'error',
     'typescript/no-misused-promises': 'error',
+    'typescript/no-unnecessary-type-assertion': 'error',
+    'typescript/no-unnecessary-type-conversion': 'error',
+    'typescript/no-unsafe-argument': 'error',
+    'typescript/no-unsafe-assignment': 'error',
+    'typescript/no-unsafe-call': 'error',
+    'typescript/no-unsafe-member-access': 'error',
+    'typescript/no-unsafe-return': 'error',
+    'typescript/no-unsafe-type-assertion': 'error',
+    'typescript/only-throw-error': 'error',
+    'typescript/switch-exhaustiveness-check': [
+      'error',
+      { allowDefaultCaseForExhaustiveSwitch: true, considerDefaultExhaustiveForUnions: true },
+    ],
+    'typescript/use-unknown-in-catch-callback-variable': 'error',
   },
   overrides: [
     {

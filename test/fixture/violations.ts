@@ -24,6 +24,10 @@ export function pause(): void {
   debugger;
 }
 
+export function fail(): never {
+  throw 'failed';
+}
+
 // oxlint-disable-next-line anti-slop/no-chained-type-assertions
 export const count = 1;
 

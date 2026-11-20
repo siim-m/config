@@ -48,6 +48,7 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
       'eslint(no-debugger)',
       'typescript(no-floating-promises)',
       'typescript(no-misused-promises)',
+      'typescript(only-throw-error)',
     ],
     output
   );
