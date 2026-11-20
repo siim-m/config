@@ -55,6 +55,30 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
   assert.equal(rules.has('test/fixture/clean.ts'), false, output);
 });
 
+test('the oxlint preset reports tests that cannot fail or lean on time', () => {
+  const { status, output } = run('oxlint', [
+    '--type-aware',
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint.config.mts',
+    'test/fixture/honesty.test.ts',
+  ]);
+
+  assert.equal(status, 1, output);
+  // The first test asserts on a result, so it passes; each other test trips one rule, and the
+  // last trips two.
+  assert.deepEqual(
+    reportedRules(output).get('test/fixture/honesty.test.ts'),
+    [
+      'ai-guard(no-assertionless-test)',
+      'ai-guard(no-tautological-assertion)',
+      'landmines(no-fixed-sleep)',
+      'landmines(no-flake-masking)',
+    ],
+    output
+  );
+});
+
 test('the React preset adds its plugins and rules on top of the base', () => {
   const { status, output } = run('oxlint', [
     '--type-aware',

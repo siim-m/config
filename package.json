@@ -17,6 +17,8 @@
     "./anti-slop": "./dist/anti-slop/index.js",
     "./anti-slop-effect": "./dist/anti-slop/effect/index.js",
     "./anti-slop-react": "./dist/anti-slop-react/index.js",
+    "./ai-guard": "./dist/ai-guard.js",
+    "./landmines": "./dist/landmines.js",
     "./tsconfig.json": "./tsconfig.base.json",
     "./reset.d.ts": "./reset.d.ts"
   },
@@ -33,8 +35,10 @@
     "prepublishOnly": "bun run check"
   },
   "dependencies": {
+    "@interfere/landmines": "^0.1.1",
     "@oxlint/plugins": "^1.92.0",
-    "@total-typescript/ts-reset": "^0.6.1"
+    "@total-typescript/ts-reset": "^0.6.1",
+    "eslint-plugin-ai-guard": "^1.4.7"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

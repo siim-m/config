@@ -14,6 +14,8 @@ const preset = {
   jsPlugins: [
     { name: 'anti-slop', specifier: '@siim-m/config/anti-slop' },
     { name: 'anti-slop-effect', specifier: '@siim-m/config/anti-slop-effect' },
+    { name: 'ai-guard', specifier: '@siim-m/config/ai-guard' },
+    { name: 'landmines', specifier: '@siim-m/config/landmines' },
   ],
   categories: { correctness: 'error' },
   rules: {
@@ -45,6 +47,16 @@ const preset = {
     'anti-slop-effect/prefer-effect-match': 'error',
     'anti-slop-effect/require-cause-when-narrowing': 'error',
     'anti-slop-effect/throw-in-effect-gen': 'error',
+    'ai-guard/no-assertionless-test': 'error',
+    'ai-guard/no-placeholder-implementation': 'error',
+    'ai-guard/no-silent-fallback': 'error',
+    'ai-guard/no-tautological-assertion': 'error',
+    'ai-guard/no-test-env-branch': 'error',
+    'ai-guard/no-undeclared-import': 'error',
+    'landmines/no-fixed-sleep': 'error',
+    'landmines/no-flake-masking': 'error',
+    'landmines/no-unsignaled-poll': 'error',
+    'landmines/strict-msw': 'error',
     // Spreads in reducers; anti-slop/no-reduce-accumulator-copy covers the other copies.
     'oxc/no-accumulating-spread': 'error',
     eqeqeq: 'error',

@@ -50,6 +50,19 @@ repeat the name below them. `forbidden` adds patterns of your own:
 comments that start with an `allow` prefix stay. The prefixes default to `SAFETY`, `SYNC` and
 `WARNING`, which the type-assertion and React effect rules ask for.
 
+## Tests and shortcuts
+
+Ten rules from two npm packages report tests that pass whatever the code does or lean on time, and
+other shortcuts agents take:
+
+- From [eslint-plugin-ai-guard](https://github.com/ai-guard-dev/eslint-plugin-ai-guard):
+  `no-assertionless-test`, `no-tautological-assertion`, `no-placeholder-implementation`,
+  `no-test-env-branch`, `no-silent-fallback` and `no-undeclared-import`. Its test detection doesn't
+  know Effect's `it.effect`, so those tests go unchecked.
+- From [landmines](https://github.com/interfere-inc/landmines): `no-fixed-sleep`,
+  `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. The first three take an
+  `allow: { "<file>": <count> }` option for adopting them file by file.
+
 ## React
 
 For React code that the React Compiler compiles, extend the React preset after the base one:
@@ -77,4 +90,7 @@ In `.tsx` files a number can't be a condition, because `{count && <p />}` render
 
 MIT. The anti-slop rules are MIT, copyright Dillon Mulroy; `require-readable-spacing` uses MIT code
 from ESLint Stylistic. The `anti-slop-react` rules are MIT, copyright T3 Tools Inc.: rewritten from
-T3 Code's `oxlint-plugin-t3code` at `2de3370`, and not kept in step with it.
+T3 Code's `oxlint-plugin-t3code` at `2de3370`, and not kept in step with it. `anti-slop/comments`
+and `anti-slop/require-suppression-reason` adapt code from the same plugin. Four `anti-slop-effect`
+rules and `no-disabled-type-assertion-rules` are MIT, from Kyle Mistele's fork of anti-slop.
+eslint-plugin-ai-guard and @interfere/landmines are MIT dependencies.
