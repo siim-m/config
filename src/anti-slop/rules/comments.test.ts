@@ -93,6 +93,13 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// The CLI prints its result.\n// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
       options: taggedOnly,
     },
+    // A destructured binding exported by name (S14).
+    { code: '/** The API. */\nconst { api } = source;\nexport { api };', options: taggedOnly },
+    // A reason above a multi-line disable block (S12).
+    {
+      code: '// Scripts print.\n/* oxlint-disable\n   no-console */\nconsole.log(1);',
+      options: taggedOnly,
+    },
   ],
   invalid: [
     {
@@ -215,6 +222,17 @@ tester.run('anti-slop/comments', commentsRule, {
     {
       code: "enum State {\n  /** Ready. */\n  Ready = 'ready',\n}",
       errors: [{ messageId: 'restatesName' }],
+    },
+    // Quoted enum member names count (S13).
+    {
+      code: "enum State {\n  /** In progress. */\n  'in-progress' = 1,\n}",
+      errors: [{ messageId: 'restatesName' }],
+    },
+    // A trailing directive doesn't carry a reason down to a suppression (S12).
+    {
+      code: '// Starts it.\nstart(); // prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      options: taggedOnly,
+      errors: [{ messageId: 'untagged' }],
     },
   ],
 });

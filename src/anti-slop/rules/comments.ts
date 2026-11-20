@@ -53,11 +53,15 @@ const isDoc = (comment: Comment): boolean =>
   comment.type === 'Block' && comment.value.startsWith('*');
 
 /** A comment's lines of prose: no doc-comment stars, blank lines or directives. */
-const textLines = (comment: Comment): readonly string[] =>
-  comment.value
+const textLines = (comment: Comment): readonly string[] => {
+  const lines = comment.value
     .split('\n')
     .map((line) => line.replace(/^\s*\*?\s?/u, '').trim())
-    .filter((line) => line !== '' && line !== '*' && !DIRECTIVE.test(line));
+    .filter((line) => line !== '' && line !== '*');
+  // A block that opens with a directive, such as a multi-line `oxlint-disable`, is all directive.
+  if (comment.type === 'Block' && DIRECTIVE.test(lines[0] ?? '')) return [];
+  return lines.filter((line) => !DIRECTIVE.test(line));
+};
 
 /** A comment that holds only directives, such as `// oxlint-disable-next-line rule -- reason`. */
 const isDirective = (comment: Comment): boolean =>
@@ -103,7 +107,10 @@ const isExport = (node: ESTree.Node): boolean =>
   node.type === 'ExportAllDeclaration';
 
 /** Top-level statements that export, and declarations of a binding that `export { name }` or `export default name` exports. */
-function exportedStatements(program: ESTree.Program): ReadonlySet<ESTree.Node> {
+function exportedStatements(
+  program: ESTree.Program,
+  sourceCode: SourceCode
+): ReadonlySet<ESTree.Node> {
   const names = new Set<string>();
   for (const statement of program.body) {
     if (
@@ -127,9 +134,8 @@ function exportedStatements(program: ESTree.Program): ReadonlySet<ESTree.Node> {
       exported.add(statement);
     } else if (statement.type === 'VariableDeclaration') {
       for (const declarator of statement.declarations) {
-        if (declarator.id.type === 'Identifier' && names.has(declarator.id.name)) {
-          exported.add(declarator);
-        }
+        const declared = sourceCode.getDeclaredVariables(declarator);
+        if (declared.some((variable) => names.has(variable.name))) exported.add(declarator);
       }
     } else if (
       'id' in statement &&
@@ -150,13 +156,19 @@ const docTarget = (node: ESTree.Node): ESTree.Node =>
  * Whether a suppression directive follows a comment group on the next lines, past other
  * directives, so the group is its reason, as `require-suppression-reason` reads it.
  */
-function suppressionFollows(groups: readonly (readonly Comment[])[], index: number): boolean {
+function suppressionFollows(
+  groups: readonly (readonly Comment[])[],
+  index: number,
+  ownLine: (comment: Comment) => boolean
+): boolean {
   let line = groups[index]?.at(-1)?.loc.end.line ?? 0;
-  for (const group of groups.slice(index + 1)) {
-    const [comment] = group;
-    if (comment === undefined || comment.loc.start.line !== line + 1 || !isDirective(comment))
+  for (let next = index + 1; next < groups.length; next++) {
+    const comment = groups[next]?.[0];
+    if (comment === undefined || comment.loc.start.line !== line + 1 || !ownLine(comment)) {
       return false;
+    }
     if (SUPPRESSION.test(comment.value)) return true;
+    if (!isDirective(comment)) return false;
     line = comment.loc.end.line;
   }
   return false;
@@ -268,6 +280,8 @@ export const commentsRule = defineRule({
     const named = new Map<number, string>();
     const name = (node: ESTree.Node, id: ESTree.Node | null | undefined) => {
       if (id?.type === 'Identifier') named.set(node.start, id.name);
+      else if (id?.type === 'Literal' && typeof id.value === 'string')
+        named.set(node.start, id.value);
     };
     const collect = (node: ESTree.Node) => {
       members.push(node);
@@ -355,7 +369,7 @@ export const commentsRule = defineRule({
       ExportNamedDeclaration: exported,
       ExportDefaultDeclaration: exported,
       'Program:exit'(program) {
-        const exportedNodes = exportedStatements(program);
+        const exportedNodes = exportedStatements(program, sourceCode);
         const exportDocs = new Set<number>();
         const addDoc = (node: ESTree.Node) => {
           const doc = docBefore(node, sourceCode);
@@ -380,7 +394,10 @@ export const commentsRule = defineRule({
             (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
           const lines = group.flatMap(textLines);
           if (licence || lines.length === 0) continue;
-          const explainsSuppression = ownLine(first) && suppressionFollows(groups, index);
+          const explainsSuppression =
+            options.policy === 'tagged-only' &&
+            ownLine(first) &&
+            suppressionFollows(groups, index, ownLine);
           const found = problem(
             group,
             lines,
