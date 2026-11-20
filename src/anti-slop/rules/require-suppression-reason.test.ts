@@ -19,9 +19,20 @@ tester.run('anti-slop/require-suppression-reason', requireSuppressionReasonRule,
     { code: '// oxlint-disable-next-line no-console\nconsole.log(1);', errors: [lint] },
     { code: '/* eslint-disable no-console */\nconsole.log(1);', errors: [lint] },
     { code: '// oxlint-disable-next-line no-console --\nconsole.log(1);', errors: [lint] },
-    { code: 'const a = 1;\n// oxlint-disable-next-line no-console\nconsole.log(a);', errors: [lint] },
+    {
+      code: 'const a = 1;\n// oxlint-disable-next-line no-console\nconsole.log(a);',
+      errors: [lint],
+    },
     { code: '// @ts-expect-error\nconst a: string = 1;', errors: [typescript] },
     { code: '// @ts-ignore\nconst a: string = 1;', errors: [typescript] },
+    {
+      code: '// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      errors: [lint],
+    },
+    {
+      code: '#!/usr/bin/env node\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      errors: [lint],
+    },
     { code: '// @ts-nocheck\nconst a = 1;', errors: [typescript] },
   ],
 });

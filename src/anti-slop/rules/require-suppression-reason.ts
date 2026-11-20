@@ -2,7 +2,7 @@ import { defineRule } from '@oxlint/plugins';
 import type { Comment } from '@oxlint/plugins';
 
 const DIRECTIVE =
-  /^\s*\*?\s*(?:(?:oxlint|eslint)-(?:disable|enable)|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics)/u;
+  /^\s*\*?\s*(?:(?:oxlint|eslint)-(?:disable|enable)|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore)/u;
 const TYPESCRIPT_DIRECTIVE = /^\s*\*?\s*@ts-(?:expect-error|ignore|nocheck)(?![\w-])(.*)$/su;
 const EMPTY = /^[\s*]*$/u;
 
@@ -16,8 +16,10 @@ export const requireSuppressionReasonRule = defineRule({
     type: 'suggestion',
     docs: { description: 'Require every lint or type-checker suppression to say why.' },
     messages: {
-      lintDirective: 'Say why: end the directive with `-- reason`, or put a comment on the line above.',
-      typescriptDirective: 'Say why: write the reason after the directive, or in a comment on the line above.',
+      lintDirective:
+        'Say why: end the directive with `-- reason`, or put a comment on the line above.',
+      typescriptDirective:
+        'Say why: write the reason after the directive, or in a comment on the line above.',
     },
   },
   createOnce(context) {
@@ -27,6 +29,7 @@ export const requireSuppressionReasonRule = defineRule({
         const comments = sourceCode.getAllComments();
         const ownLineByEndLine = new Map<number, Comment>();
         for (const comment of comments) {
+          if (comment.type === 'Shebang') continue;
           const { line, column } = comment.loc.start;
           if ((sourceCode.lines[line - 1] ?? '').slice(0, column).trim() === '') {
             ownLineByEndLine.set(comment.loc.end.line, comment);

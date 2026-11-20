@@ -16,11 +16,13 @@ interface Options {
 
 const DIRECTIVE =
   /^(?:(?:oxlint|eslint)-|@ts-|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
-const LICENSE = /@license\b|\bSPDX-License-Identifier\b|\bcopyright\b/iu;
+const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
+const COPYRIGHT = /\bcopyright\b/iu;
+const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
 const URL = /\bhttps?:\/\/\S+/gu;
 const CODE_SPAN = /`[^`]*`/gu;
 const ISSUE = /(?<![\w&/])#\d+\b(?![a-f])/giu;
-const DIVIDER = /^(?:[-=*#~_/+]{3,}.*|.*[-=*#~_]{3,})$/u;
+const DIVIDER = /^(?:[-=*#~_/+\u2500-\u257F]{3,}.*|.*[-=*#~_\u2500-\u257F]{3,})$/u;
 const STEP_LABEL = /^(?:arrange|act|assert|given|when|then)\s*[:.]?$/iu;
 const TASK_MARKER = /\b(?:TODO|FIXME|XXX|HACK)\b/u;
 const TASK_LINK = /#\d+|https?:\/\//u;
@@ -28,13 +30,9 @@ const JSDOC_TYPE = /^@(?:param|returns?|type|typedef)\s+\{/u;
 const EMPTY_JSDOC_TAG = /^@(?:param(?:\s+\[?[\w$.]+\]?)?|returns?)$/u;
 const COMMENTED_CODE =
   /^(?:(?:(?:const|let|var)\s+[\w${}[\], ]+=.*|import\s.+\sfrom\s+["'].+["']|(?:await\s+|return\s+)?[\w$.]+\(.*\)|[\w$.[\]]+\s*=\s*.+);|(?:if|for|while|switch)\s*\(.*\)\s*\{|\}(?:\s*else\s*\{)?)$/u;
-const DECLARATION =
-  /^\s*(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:async\s+)?(?:static\s+)?(?:readonly\s+)?(?:(?:const|let|var|function\*?|class|interface|type|enum)\s+)?([A-Za-z_$][\w$]*)\s*[?!]?\s*[:=(<{]/u;
 const TYPESCRIPT_FILE = /\.[cm]?tsx?$/u;
 const FILLER = new Set(
-  'a an the of for to in on at by with from and or is are be this that it its as get set return create new current value given whether'.split(
-    ' '
-  )
+  'a an the of for to in on at by with from and or is are be this that it its as'.split(' ')
 );
 
 /** The words a comment or name carries once filler words go and plurals fold. */
@@ -46,10 +44,13 @@ const contentWords = (text: string): readonly string[] =>
 
 const nameWords = (name: string): ReadonlySet<string> =>
   new Set(
-    contentWords(name.replace(/([a-z0-9])([A-Z])/gu, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/gu, '$1 $2'))
+    contentWords(
+      name.replace(/([a-z0-9])([A-Z])/gu, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/gu, '$1 $2')
+    )
   );
 
-const isDoc = (comment: Comment): boolean => comment.type === 'Block' && comment.value.startsWith('*');
+const isDoc = (comment: Comment): boolean =>
+  comment.type === 'Block' && comment.value.startsWith('*');
 
 /** A comment's lines of prose: no doc-comment stars, blank lines or directives. */
 const textLines = (comment: Comment): readonly string[] =>
@@ -58,8 +59,15 @@ const textLines = (comment: Comment): readonly string[] =>
     .map((line) => line.replace(/^\s*\*?\s?/u, '').trim())
     .filter((line) => line !== '' && line !== '*' && !DIRECTIVE.test(line));
 
-/** Adjacent `//` lines at one indent read as one comment. */
-function commentGroups(comments: readonly Comment[], text: string): readonly (readonly Comment[])[] {
+/** A comment that holds only directives, such as `// oxlint-disable-next-line rule -- reason`. */
+const isDirective = (comment: Comment): boolean =>
+  comment.value.trim() !== '' && textLines(comment).length === 0;
+
+/** Adjacent `//` lines at one indent read as one comment; a directive stands alone. */
+function commentGroups(
+  comments: readonly Comment[],
+  text: string
+): readonly (readonly Comment[])[] {
   const groups: Comment[][] = [];
   for (const comment of comments) {
     if (comment.type === 'Shebang') continue;
@@ -67,6 +75,9 @@ function commentGroups(comments: readonly Comment[], text: string): readonly (re
     const previous = group?.at(-1);
     const continues =
       group !== undefined &&
+      previous !== undefined &&
+      !isDirective(previous) &&
+      !isDirective(comment) &&
       previous?.type === 'Line' &&
       comment.type === 'Line' &&
       previous.loc.start.column === comment.loc.start.column &&
@@ -81,7 +92,8 @@ function commentGroups(comments: readonly Comment[], text: string): readonly (re
 function docBefore(node: ESTree.Node, sourceCode: SourceCode): Comment | undefined {
   const comments = sourceCode.getCommentsBefore(node);
   let comment = comments.pop();
-  while (comment !== undefined && !isDoc(comment) && textLines(comment).length === 0) comment = comments.pop();
+  while (comment !== undefined && !isDoc(comment) && textLines(comment).length === 0)
+    comment = comments.pop();
   return comment !== undefined && isDoc(comment) ? comment : undefined;
 }
 
@@ -90,18 +102,59 @@ const isExport = (node: ESTree.Node): boolean =>
   node.type === 'ExportDefaultDeclaration' ||
   node.type === 'ExportAllDeclaration';
 
+/** Top-level statements that export, or declare a binding that `export { name }` or `export default name` exports. */
+function exportedStatements(
+  program: ESTree.Program,
+  sourceCode: SourceCode
+): ReadonlySet<ESTree.Node> {
+  const names = new Set<string>();
+  for (const statement of program.body) {
+    if (
+      statement.type === 'ExportNamedDeclaration' &&
+      statement.declaration === null &&
+      statement.source === null
+    ) {
+      for (const specifier of statement.specifiers) {
+        if (specifier.local.type === 'Identifier') names.add(specifier.local.name);
+      }
+    } else if (
+      statement.type === 'ExportDefaultDeclaration' &&
+      statement.declaration.type === 'Identifier'
+    ) {
+      names.add(statement.declaration.name);
+    }
+  }
+  return new Set(
+    program.body.filter(
+      (statement) =>
+        isExport(statement) ||
+        sourceCode.getDeclaredVariables(statement).some((variable) => names.has(variable.name))
+    )
+  );
+}
+
+const FUNCTIONS: ReadonlySet<string> = new Set([
+  'ArrowFunctionExpression',
+  'FunctionExpression',
+  'FunctionDeclaration',
+]);
+
 /** Whether a member belongs to an exported declaration and is public: not in a function body, not private. */
-function isExposedMember(member: ESTree.Node): boolean {
+function isExposedMember(member: ESTree.Node, exported: ReadonlySet<ESTree.Node>): boolean {
   let node: ESTree.Node = member;
   for (;;) {
     if (node.type === 'BlockStatement' || node.type === 'StaticBlock') return false;
-    if ('accessibility' in node && (node.accessibility === 'private' || node.accessibility === 'protected')) {
+    if (
+      'accessibility' in node &&
+      (node.accessibility === 'private' || node.accessibility === 'protected')
+    ) {
       return false;
     }
     if ('key' in node && node.key.type === 'PrivateIdentifier') return false;
     const parent: ESTree.Node | null = node.parent;
     if (parent === null) return false;
-    if (parent.type === 'Program') return isExport(node);
+    if (parent.type === 'Program') return exported.has(node);
+    if (FUNCTIONS.has(parent.type) && 'body' in parent && parent.body === node) return false;
     node = parent;
   }
 }
@@ -116,7 +169,8 @@ export const commentsRule = defineRule({
   meta: {
     type: 'suggestion',
     docs: {
-      description: 'Hold comments to a short why, or with the tagged-only policy, to tagged comments and docs on exports.',
+      description:
+        'Hold comments to a short why, or with the tagged-only policy, to tagged comments and docs on exports.',
     },
     schema: [
       {
@@ -140,14 +194,22 @@ export const commentsRule = defineRule({
       },
     ],
     defaultOptions: [
-      { policy: 'budget', maxWords: 30, maxExportDocWords: 45, allow: ['SAFETY', 'SYNC', 'WARNING'], forbidden: [] },
+      {
+        policy: 'budget',
+        maxWords: 30,
+        maxExportDocWords: 45,
+        allow: ['SAFETY', 'SYNC', 'WARNING'],
+        forbidden: [],
+      },
     ],
     messages: {
       tooLong:
         "This comment has {{words}} words; the limit is {{max}}. Keep the why the code can't say, and leave the history to git and the PR.",
-      issueChain: 'This comment cites {{count}} issues. Cite the one that decided the code; git has the rest.',
+      issueChain:
+        'This comment cites {{count}} issues. Cite the one that decided the code; git has the rest.',
       forbidden: 'This comment has `{{match}}` in it. {{message}}',
-      divider: "Drop the section divider. Split the file, or let the code's structure show the grouping.",
+      divider:
+        "Drop the section divider. Split the file, or let the code's structure show the grouping.",
       stepLabel: 'Drop the test step label.',
       commentedOutCode: 'Delete the commented-out code; git keeps it.',
       restatesName: 'This comment only repeats the name below it. Say why, or say nothing.',
@@ -163,18 +225,40 @@ export const commentsRule = defineRule({
     const [options] = context.options as unknown as readonly [Options];
     const { sourceCode } = context;
     const typescript = TYPESCRIPT_FILE.test(context.filename);
-    const forbidden = options.forbidden.map(({ pattern, message }) => ({ pattern: new RegExp(pattern, 'u'), message }));
+    const forbidden = options.forbidden.map(({ pattern, message }) => ({
+      pattern: new RegExp(pattern, 'u'),
+      message,
+    }));
     const isTagged = (line: string) =>
-      options.allow.some((prefix) => line.startsWith(`${prefix}:`) && line.slice(prefix.length + 1).trim() !== '');
+      options.allow.some(
+        (prefix) => line.startsWith(`${prefix}:`) && line.slice(prefix.length + 1).trim() !== ''
+      );
     const prefixes = options.allow.map((prefix) => `\`${prefix}:\``).join(', ');
     const members: ESTree.Node[] = [];
+    /** Declarations and members by where they start, for the name a comment sits above. */
+    const named = new Map<number, string>();
+    const name = (node: ESTree.Node, id: ESTree.Node | null | undefined) => {
+      if (id?.type === 'Identifier') named.set(node.start, id.name);
+    };
     const collect = (node: ESTree.Node) => {
       members.push(node);
+      if ('key' in node) name(node, node.key);
+    };
+    const declaration = (node: ESTree.Node) => {
+      if (node.type === 'VariableDeclaration') name(node, node.declarations[0]?.id);
+      else if ('id' in node) name(node, node.id);
+    };
+    const exported = (node: ESTree.ExportNamedDeclaration | ESTree.ExportDefaultDeclaration) => {
+      const inner = node.declaration;
+      if (inner === null) return;
+      if (inner.type === 'VariableDeclaration') name(node, inner.declarations[0]?.id);
+      else if ('id' in inner) name(node, inner.id);
     };
 
-    const restatesName = (lastLine: number, lines: readonly string[]): boolean => {
+    const restatesName = (last: Comment, lines: readonly string[]): boolean => {
       if (lines.some((line) => line.startsWith('@'))) return false;
-      const name = DECLARATION.exec(sourceCode.lines[lastLine] ?? '')?.[1];
+      const next = sourceCode.getTokenAfter(last);
+      const name = next === null ? undefined : named.get(next.start);
       if (name === undefined) return false;
       const words = contentWords(lines.join(' '));
       const fromName = nameWords(name);
@@ -185,12 +269,18 @@ export const commentsRule = defineRule({
     const problem = (
       group: readonly Comment[],
       lines: readonly string[],
-      exportDoc: boolean
+      exportDoc: boolean,
+      explainsSuppression: boolean
     ): readonly [string, Record<string, string | number>?] | undefined => {
       const isLine = group[0]?.type === 'Line';
       const body = lines.join('\n');
       const prose = body.replace(URL, '');
-      if (options.policy === 'tagged-only' && !exportDoc && !isTagged(lines[0] ?? '')) {
+      if (
+        options.policy === 'tagged-only' &&
+        !exportDoc &&
+        !explainsSuppression &&
+        !isTagged(lines[0] ?? '')
+      ) {
         return ['untagged', { prefixes }];
       }
       if (lines.some((line) => DIVIDER.test(line))) return ['divider'];
@@ -200,8 +290,11 @@ export const commentsRule = defineRule({
       const issues = new Set(prose.replace(CODE_SPAN, '').match(ISSUE) ?? []);
       if (issues.size > 1) return ['issueChain', { count: issues.size }];
       if (typescript && lines.some((line) => JSDOC_TYPE.test(line))) return ['jsdocType'];
-      if (lines.some((line) => EMPTY_JSDOC_TAG.test(line))) return ['emptyJsdocTag'];
-      if (restatesName(group.at(-1)?.loc.end.line ?? 0, lines)) return ['restatesName'];
+      const describedLater = (index: number) => (lines[index + 1] ?? '@').startsWith('@') === false;
+      if (lines.some((line, index) => EMPTY_JSDOC_TAG.test(line) && !describedLater(index)))
+        return ['emptyJsdocTag'];
+      const last = group.at(-1);
+      if (last !== undefined && restatesName(last, lines)) return ['restatesName'];
       const words = body.split(/\s+/u).filter((word) => word !== '').length;
       const max = exportDoc ? options.maxExportDocWords : options.maxWords;
       if (words > max) return ['tooLong', { words, max }];
@@ -222,22 +315,48 @@ export const commentsRule = defineRule({
       PropertyDefinition: collect,
       MethodDefinition: collect,
       Property: collect,
+      VariableDeclaration: declaration,
+      FunctionDeclaration: declaration,
+      ClassDeclaration: declaration,
+      TSDeclareFunction: declaration,
+      TSInterfaceDeclaration: declaration,
+      TSTypeAliasDeclaration: declaration,
+      TSEnumDeclaration: declaration,
+      ExportNamedDeclaration: exported,
+      ExportDefaultDeclaration: exported,
       'Program:exit'(program) {
+        const exportedNodes = exportedStatements(program, sourceCode);
         const exportDocs = new Set<number>();
         const addDoc = (node: ESTree.Node) => {
           const doc = docBefore(node, sourceCode);
           if (doc !== undefined) exportDocs.add(doc.start);
         };
-        for (const statement of program.body) if (isExport(statement)) addDoc(statement);
-        for (const member of members) if (isExposedMember(member)) addDoc(member);
+        for (const statement of exportedNodes) addDoc(statement);
+        for (const member of members) if (isExposedMember(member, exportedNodes)) addDoc(member);
+        const codeStart = program.body[0]?.start ?? sourceCode.text.length;
 
-        for (const group of commentGroups(sourceCode.getAllComments(), sourceCode.text)) {
-          if (group.some((comment) => comment.value.startsWith('!') || LICENSE.test(comment.value))) continue;
-          const lines = group.flatMap(textLines);
+        const groups = commentGroups(sourceCode.getAllComments(), sourceCode.text);
+        for (const [index, group] of groups.entries()) {
           const first = group[0];
           const last = group.at(-1);
-          if (lines.length === 0 || first === undefined || last === undefined) continue;
-          const found = problem(group, lines, group.length === 1 && exportDocs.has(first.start));
+          if (first === undefined || last === undefined) continue;
+          const licence =
+            first.value.startsWith('!') ||
+            group.some((comment) => LICENSE.test(comment.value)) ||
+            (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
+          const lines = group.flatMap(textLines);
+          if (licence || lines.length === 0) continue;
+          const next = groups[index + 1]?.[0];
+          const explainsSuppression =
+            next !== undefined &&
+            next.loc.start.line === last.loc.end.line + 1 &&
+            SUPPRESSION.test(next.value);
+          const found = problem(
+            group,
+            lines,
+            group.length === 1 && exportDocs.has(first.start),
+            explainsSuppression
+          );
           if (found === undefined) continue;
           const [messageId, data] = found;
           context.report({ loc: { start: first.loc.start, end: last.loc.end }, messageId, data });
