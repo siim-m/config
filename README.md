@@ -34,8 +34,8 @@ the project.
 A disable comment or `@ts-expect-error` must say why, after `--` or on the line above
 (`anti-slop/require-suppression-reason`). The type-assertion rules can't be disabled inline at all;
 turn one off for a file in the lint config instead (`anti-slop/no-disabled-type-assertion-rules`). A
-blanket `/* oxlint-disable */` that names no rule also silences these two checks, and oxlint can't
-report it, so catch one in review.
+file-wide or same-line disable that names no rule, or that names one of these two checks, silences
+them too, and oxlint gives a rule no way to report that, so catch one in review.
 
 ## Comments
 

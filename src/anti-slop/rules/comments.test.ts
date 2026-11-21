@@ -98,6 +98,15 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
       options: taggedOnly,
     },
+    // A glob is not a divider, a tracker key is a link, and a trailing comment belongs to its line.
+    '// **/*.test.ts files run in node.\nconst a = 1;',
+    '// TODO(ENG-123): drop once the API returns ids.\nconst a = 1;',
+    'const a = 1; // total seconds\nconst totalSeconds = 2;',
+    // Forbidden patterns skip URLs.
+    {
+      code: '// See https://example.com/2026-11-20/notes for why.\nconst a = 1;',
+      options: forbidden,
+    },
     // A markdown heading in a doc comment is not a divider.
     '/**\n * Loads a row.\n *\n * ### Example\n * load(1)\n */\nfunction load(id: number) { return id; }',
     // A placeholder such as XXX-XXX-XXXX is not a task marker.

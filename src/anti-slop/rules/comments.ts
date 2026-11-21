@@ -22,12 +22,12 @@ const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|
 const URL = /\bhttps?:\/\/\S+/gu;
 const CODE_SPAN = /`[^`]*`/gu;
 const ISSUE = /(?<![\w&/])#\d+\b(?![a-f])/giu;
-const DIVIDER = /^(?:[-=*#~_/+\u2500-\u257F]{3,}.*|.*[-=*#~_\u2500-\u257F]{3,})$/u;
+const DIVIDER = /^(?:[-=*#~_/+\u2500-\u257F]{3,}(?:\s.*)?|.*[-=*#~_\u2500-\u257F]{3,})$/u;
 const STEP_LABEL = /^(?:arrange|act|assert|given|when|then)\s*[:.]?$/iu;
 const TASK_MARKER = /(?<!-)\b(?:TODO|FIXME|XXX|HACK)\b(?!-)/u;
 /** A markdown heading, which a doc comment may use: `### Example`. */
 const HEADING = /^#{1,6}\s+\w/u;
-const TASK_LINK = /#\d+|https?:\/\//u;
+const TASK_LINK = /#\d+|\b[A-Z][A-Z\d]*-\d+\b|https?:\/\//u;
 const JSDOC_TYPE = /^@(?:param|returns?|type|typedef)\s+\{/u;
 const EMPTY_JSDOC_TAG = /^@(?:param(?:\s+\[?[\w$.]+\]?)?|returns?)$/u;
 const COMMENTED_CODE =
@@ -303,6 +303,9 @@ export const commentsRule = defineRule({
 
     const restatesName = (last: Comment, lines: readonly string[]): boolean => {
       if (lines.some((line) => line.startsWith('@'))) return false;
+      // A trailing comment belongs to the code before it on its line.
+      const before = (sourceCode.lines[last.loc.start.line - 1] ?? '').slice(0, last.loc.start.column);
+      if (before.trim() !== '') return false;
       const next = sourceCode.getTokenAfter(last);
       const name = next === null ? undefined : named.get(next.start);
       if (name === undefined) return false;

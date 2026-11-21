@@ -28,11 +28,16 @@ function directiveRules(value: string): readonly string[] | null {
     .filter((rule) => rule.length > 0);
 }
 
-/** Oxlint applies a disable that names a rule without its plugin to that rule in every plugin. */
+/**
+ * Oxlint applies a disable to a built-in rule by the name after the slash, whatever the prefix, and
+ * a disable with no prefix to that name in every plugin.
+ */
 function isTypeAssertionRule(typeAssertionRules: ReadonlySet<string>, rule: string): boolean {
   if (typeAssertionRules.has(rule)) return true;
-  if (rule.includes("/")) return false;
-  return [...typeAssertionRules].some((known) => known.endsWith(`/${rule}`));
+  const name = rule.slice(rule.lastIndexOf("/") + 1);
+  return [...typeAssertionRules].some(
+    (known) => known === `typescript/${name}` || (!rule.includes("/") && known.endsWith(`/${name}`)),
+  );
 }
 
 function configuredAdditionalRules(option: unknown): readonly string[] {
