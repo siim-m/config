@@ -11,7 +11,8 @@ const DIRECTIVE =
   /^(?:(?:oxlint|eslint)-(?:disable|enable|env)\b|eslint\s+[\w@/-]+\s*:\s*(?:off|warn|error|[012]|\[)|@ts-(?:expect-error|ignore|nocheck|check)\b|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
-const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
+const SUPPRESSION =
+  /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics(?:-next-line)?\s.*:(?:off|skip-file)\b|svelte-ignore\b)/u;
 const isDoc = (comment: Comment): boolean =>
   comment.type === 'Block' && comment.value.startsWith('*');
 

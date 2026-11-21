@@ -41,6 +41,11 @@ tester.run('anti-slop/comments', commentsRule, {
     '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
     '// The CLI prints its result.\nconsole.log(1); // oxlint-disable-line no-console',
     '// Scripts print.\n/* oxlint-disable\n   no-console */\nconsole.log(1);',
+    // Effect's and Svelte's suppressions take a reason above them too.
+    '// The worker reads its files directly.\n// @effect-diagnostics-next-line nodeBuiltinImport:off\nimport * as Fs from "node:fs";',
+    '// This module wraps Node.\n// @effect-diagnostics nodeBuiltinImport:off globalConsole:off\nimport * as Fs from "node:fs";',
+    '// Generated from the schema.\n// @effect-diagnostics *:skip-file\nexport const a = 1;',
+    '// Read once on purpose.\n// svelte-ignore state_referenced_locally\nconst t = title;',
   ],
   invalid: [
     // Any other comment goes.
@@ -76,6 +81,11 @@ tester.run('anti-slop/comments', commentsRule, {
     // A directive ends a comment, so a tagged line above it can't carry the line below.
     {
       code: '// SAFETY: fine.\n// oxlint-disable-next-line no-console -- logs\n// Unrelated chatter.\nconsole.log(1);',
+      errors: [{ messageId: 'untagged' }],
+    },
+    // An Effect directive that turns a check up suppresses nothing.
+    {
+      code: '// The loop must not leak.\n// @effect-diagnostics floatingEffect:error\nconst a = 1;',
       errors: [{ messageId: 'untagged' }],
     },
     // A trailing comment is not a reason, and a trailing directive doesn't carry one down.
