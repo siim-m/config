@@ -8,7 +8,9 @@ import {
 
 /** Methods that reorder an array in place and return the same array. */
 const IN_PLACE: ReadonlySet<string> = new Set(['sort', 'reverse']);
-/** Array methods that return a new array. */
+/** Directory listings, called as methods of Node's fs or Effect's FileSystem, which return a new array. */
+const LISTINGS: ReadonlySet<string> = new Set(['readdirSync', 'readdir', 'readDirectory']);
+/** Methods that return a new array. */
 const COPYING_METHODS: ReadonlySet<string> = new Set([
   'map',
   'filter',
@@ -21,10 +23,7 @@ const COPYING_METHODS: ReadonlySet<string> = new Set([
   'toSpliced',
   'with',
   'split',
-  // Directory listings from Node and Effect's FileSystem.
-  'readdirSync',
-  'readdir',
-  'readDirectory',
+  ...LISTINGS,
 ]);
 /** Global functions that return a new array, as `Object.keys`. */
 const COPYING_FUNCTIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
@@ -61,10 +60,12 @@ function isFresh(
   const node = unwrapArrayExpression(expression);
   const fresh = (part: ESTree.Node) => isFresh(part, call, sourceCode, visited);
   if (node.type === 'ArrayExpression') return true;
-  // `await readdir(dir)` and `yield* fs.readDirectory(dir)` hold what the call returns.
+  // `await fsp.readdir(dir)` holds what the call returns.
   if (node.type === 'AwaitExpression') return fresh(node.argument);
+  // `yield*` runs an Effect, whose `map` is no array method, so only a listing counts.
   if (node.type === 'YieldExpression' && node.delegate && node.argument !== null) {
-    return fresh(node.argument);
+    const listed = methodCall(node.argument);
+    return listed !== null && LISTINGS.has(listed.name);
   }
   if (node.type === 'ConditionalExpression') return fresh(node.consequent) && fresh(node.alternate);
   if (node.type === 'LogicalExpression') return fresh(node.left) && fresh(node.right);
@@ -95,7 +96,7 @@ function isFresh(
   );
   // A binding outside this function, such as a module constant, is shared by every call.
   const sameFunction = variable.scope.variableScope === sourceCode.getScope(call).variableScope;
-  return (
+  const result =
     variable.defs.length === 1 &&
     definition?.type === 'Variable' &&
     declarator?.type === 'VariableDeclarator' &&
@@ -103,8 +104,10 @@ function isFresh(
     declarator.init !== null &&
     !reassigned &&
     sameFunction &&
-    fresh(declarator.init)
-  );
+    fresh(declarator.init);
+  // `visited` guards only the current path, so both arms of `c ? out : out` may reach `out`.
+  visited.delete(variable);
+  return result;
 }
 
 /**

@@ -53,6 +53,13 @@ tester.run('anti-slop/no-shared-array-sort', noSharedArraySortRule, {
     `const a = (dir: string) => NodeFS.readdirSync(dir).sort();
     const b = async (dir: string) => (await NodeFSP.readdir(dir)).sort();
     const c = (dir: string) => Effect.gen(function* () { return (yield* fs.readDirectory(dir)).sort(); });`,
+    // Both arms of a conditional may reach the same fresh binding.
+    `function order(rows: Row[], desc: boolean, sorted: boolean) {
+      const out = rows.slice();
+      const ordered = desc ? out.reverse() : out;
+      ordered.sort();
+      return (sorted ? out : out.sort(byDate)).reverse();
+    }`,
     // A type assertion around a fresh array doesn't hide it.
     'const sorted = (xs: number[]) => (xs.slice() as number[]).sort();',
   ],
@@ -76,6 +83,15 @@ tester.run('anti-slop/no-shared-array-sort', noSharedArraySortRule, {
     },
     { code: 'const f = (xs: number[]) => xs["sort"]();', errors: [shared('sort')] },
     { code: 'const f = async () => (await loadRows()).sort();', errors: [shared('sort')] },
+    // Effect's map under `yield*` returns whatever its function does, here a shared array.
+    {
+      code: `const f = (cache: number[]) => Effect.gen(function* () {
+        const items = yield* Effect.map(load, () => cache);
+        items.sort();
+        return (yield* Option.map(found, () => cache)).reverse();
+      });`,
+      errors: [shared('sort'), shared('reverse')],
+    },
     // A parameter, property or import belongs to the caller.
     { code: 'function order(xs: number[]) { xs.sort(); }', errors: [shared('sort')] },
     { code: 'const flip = (xs: number[]) => xs.reverse();', errors: [shared('reverse')] },
