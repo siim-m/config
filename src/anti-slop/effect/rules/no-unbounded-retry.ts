@@ -91,6 +91,8 @@ const every = (bounds: readonly Bound[]): Bound => {
 interface ScheduleReader {
 	readonly sourceCode: SourceCode;
 	readonly names: EffectModuleNames;
+	/** The schedule expressions being read, so a schedule defined in terms of itself reads as unknown. */
+	readonly reading: Set<ESTree.Node>;
 }
 
 /** Whether a `Schedule.upTo` options argument names a limit. Options the rule cannot read count as one. */
@@ -124,6 +126,28 @@ function applyStep(reader: ScheduleReader, current: Bound, step: ESTree.Expressi
 /** Whether a schedule expression stops on its own. */
 function scheduleBound(reader: ScheduleReader, expression: ESTree.Expression): Bound {
 	const node = resolveConst(reader.sourceCode, expression);
+	if (reader.reading.has(node)) return "unknown";
+	reader.reading.add(node);
+	try {
+		return readScheduleBound(reader, node);
+	} finally {
+		reader.reading.delete(node);
+	}
+}
+
+/** The bounds of the schedules in an array literal, or null when an element is a spread or a hole. */
+function elementBounds(reader: ScheduleReader, expression: ESTree.Expression): readonly Bound[] | null {
+	const array = resolveConst(reader.sourceCode, expression);
+	if (array.type !== "ArrayExpression" || array.elements.length === 0) return null;
+	const bounds: Bound[] = [];
+	for (const element of array.elements) {
+		if (element === null || element.type === "SpreadElement") return null;
+		bounds.push(scheduleBound(reader, element));
+	}
+	return bounds;
+}
+
+function readScheduleBound(reader: ScheduleReader, node: ESTree.Expression): Bound {
 	const constant = moduleMemberName(node, reader.names, "Schedule");
 	if (constant === "forever") return "unbounded";
 	if (constant === "once") return "bounded";
@@ -142,6 +166,12 @@ function scheduleBound(reader: ScheduleReader, expression: ESTree.Expression): B
 	if (boundedConstructors.has(member)) return "bounded";
 	const args = expressionArguments(node);
 	const [self, ...rest] = args ?? [];
+	// Effect 4 combines schedules from one array: `Schedule.max([a, b])`.
+	if (self !== undefined && rest.length === 0 && (intersections.has(member) || unions.has(member))) {
+		const bounds = elementBounds(reader, self);
+		if (bounds === null) return "unknown";
+		return intersections.has(member) ? both(bounds) : every(bounds);
+	}
 	// Data-first combinators take the schedule first: `Schedule.upTo(schedule, { times: 3 })`.
 	if (self === undefined || rest.length === 0) return "unknown";
 	return applyCombinator(reader, scheduleBound(reader, self), member, rest);
@@ -236,12 +266,12 @@ export const noUnboundedRetryRule = defineRule({
 		},
 		messages: {
 			unboundedRetry:
-				"This retry never gives up. Bound it with `times`, `Schedule.upTo({ times })` or `Schedule.upTo({ duration })`, `Schedule.max(schedule, Schedule.recurs(n))`, or a later `Effect.timeout`.",
+				"This retry never gives up. Bound it with `times`, `Schedule.upTo({ times })` or `Schedule.upTo({ duration })`, `Schedule.max([schedule, Schedule.recurs(n)])`, or a later `Effect.timeout`.",
 		},
 	},
 	create(context) {
 		const names = collectEffectModuleNames(context.sourceCode.ast);
-		const reader: ScheduleReader = { sourceCode: context.sourceCode, names };
+		const reader: ScheduleReader = { sourceCode: context.sourceCode, names, reading: new Set() };
 
 		return {
 			CallExpression(node) {

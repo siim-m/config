@@ -28,6 +28,13 @@ function directiveRules(value: string): readonly string[] | null {
     .filter((rule) => rule.length > 0);
 }
 
+/** Oxlint applies a disable that names a rule without its plugin to that rule in every plugin. */
+function isTypeAssertionRule(typeAssertionRules: ReadonlySet<string>, rule: string): boolean {
+  if (typeAssertionRules.has(rule)) return true;
+  if (rule.includes("/")) return false;
+  return [...typeAssertionRules].some((known) => known.endsWith(`/${rule}`));
+}
+
 function configuredAdditionalRules(option: unknown): readonly string[] {
   if (typeof option !== "object" || option === null || !("additionalRules" in option)) return [];
   const { additionalRules } = option;
@@ -75,7 +82,7 @@ export const noDisabledTypeAssertionRulesRule = defineRule({
             continue;
           }
           for (const rule of rules) {
-            if (!typeAssertionRules.has(rule)) continue;
+            if (!isTypeAssertionRule(typeAssertionRules, rule)) continue;
             context.report({ node: comment, messageId: "disabledRule", data: { rule } });
           }
         }

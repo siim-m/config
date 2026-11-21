@@ -38,6 +38,11 @@ tester.run("anti-slop/no-disabled-type-assertion-rules", noDisabledTypeAssertion
       errors: [{ ...disabledRule, data: { rule: "local/no-type-assertion" } }],
     },
     { code: "// oxlint-disable-next-line\nconst id = value as UserId;", errors: [disabledEverything] },
+    // Oxlint applies a rule name without its plugin to that rule in every plugin.
+    {
+      code: "// oxlint-disable-next-line no-unsafe-type-assertion -- reason\nconst id = value as UserId;",
+      errors: [{ ...disabledRule, data: { rule: "no-unsafe-type-assertion" } }],
+    },
     { code: "/* eslint-disable */\nconst id = value as UserId;", errors: [disabledEverything] },
     { code: "// oxlint-disable-next-line -- just this once\nconst id = value as UserId;", errors: [disabledEverything] },
   ],

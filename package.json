@@ -26,7 +26,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/anti-slop/LICENSE dist/anti-slop/ && cp src/anti-slop-react/LICENSE dist/anti-slop-react/ && cp src/anti-slop/vendor/eslint-stylistic/LICENSE src/anti-slop/vendor/eslint-stylistic/padding-line-options.d.ts dist/anti-slop/vendor/eslint-stylistic/",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/anti-slop/LICENSE dist/anti-slop/ && cp src/anti-slop/effect/LICENSE-enfect dist/anti-slop/effect/ && cp src/anti-slop-react/LICENSE dist/anti-slop-react/ && cp src/anti-slop/vendor/eslint-stylistic/LICENSE src/anti-slop/vendor/eslint-stylistic/padding-line-options.d.ts dist/anti-slop/vendor/eslint-stylistic/",
     "typecheck": "tsc --noEmit",
     "test": "bun run build && node --test 'src/**/*.test.ts' 'test/*.test.ts'",
     "format": "oxfmt",
@@ -68,6 +68,9 @@
     "tsrs": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=22.18.0"
   },
   "packageManager": "bun@1.4.4"
 }

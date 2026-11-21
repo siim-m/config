@@ -24,15 +24,18 @@ export default { ...base, singleQuote: false };
 { "extends": "@siim-m/config/tsconfig.json" }
 ```
 
-Every rule is on at `error`; a project turns off what it can't pass yet. Run oxlint with
-`--type-aware`, which uses [tsrs](https://github.com/oxc-project/tsrs), the Rust port of TypeScript
-7 (in beta), when it's installed, or `oxlint-tsgolint` in its place. Either one only backs the lint
-rules, so keep the project's own `tsc` or `@effect/tsgo` typecheck. For ts-reset's stricter built-in
-types, add `import '@siim-m/config/reset.d.ts';` to a `.d.ts` file in the project.
+It needs Node 22.18 or later. Every rule is on at `error`; a project turns off what it can't pass
+yet. Run oxlint with `--type-aware`, which uses [tsrs](https://github.com/oxc-project/tsrs), the
+Rust port of TypeScript 7 (in beta), when it's installed, or `oxlint-tsgolint` in its place. Either
+one only backs the lint rules, so keep the project's own `tsc` or `@effect/tsgo` typecheck. For
+ts-reset's stricter built-in types, add `import '@siim-m/config/reset.d.ts';` to a `.d.ts` file in
+the project.
 
 A disable comment or `@ts-expect-error` must say why, after `--` or on the line above
 (`anti-slop/require-suppression-reason`). The type-assertion rules can't be disabled inline at all;
-turn one off for a file in the lint config instead (`anti-slop/no-disabled-type-assertion-rules`).
+turn one off for a file in the lint config instead (`anti-slop/no-disabled-type-assertion-rules`). A
+blanket `/* oxlint-disable */` that names no rule also silences these two checks, and oxlint can't
+report it, so catch one in review.
 
 ## Comments
 
@@ -97,5 +100,7 @@ MIT. The anti-slop rules are MIT, copyright Dillon Mulroy; `require-readable-spa
 from ESLint Stylistic. The `anti-slop-react` rules are MIT, copyright T3 Tools Inc.: rewritten from
 T3 Code's `oxlint-plugin-t3code` at `2de3370`, and not kept in step with it. `anti-slop/comments`
 and `anti-slop/require-suppression-reason` adapt code from the same plugin. Four `anti-slop-effect`
-rules and `no-disabled-type-assertion-rules` are MIT, from Kyle Mistele's fork of anti-slop.
-eslint-plugin-ai-guard and @interfere/landmines are MIT dependencies.
+rules and `no-disabled-type-assertion-rules` are MIT, from Kyle Mistele's fork of anti-slop;
+`throw-in-effect-gen` there is ported from enfect, MIT, copyright Marc Suesser, and
+`no-unbounded-retry` from cevr/effect-oxlint, MIT. eslint-plugin-ai-guard and @interfere/landmines
+are MIT dependencies.

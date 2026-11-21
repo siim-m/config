@@ -28,14 +28,19 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 
 ## From Kyle Mistele's fork
 
-Copied unchanged, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistele/anti-slop)
-at `13b0203` (2026-11-19), MIT:
+Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistele/anti-slop) at
+`13b0203` (2026-11-19), MIT. Unchanged except where "Changed" says:
 
-- `rules/no-disabled-type-assertion-rules.ts`
+- `rules/no-disabled-type-assertion-rules.ts`. Changed: a rule named without its plugin, such as
+  `no-unsafe-type-assertion`, counts, since oxlint applies it to every plugin.
 - `effect/rules/no-ordie-in-service-construction.ts`
-- `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT).
+- `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT, which ships no
+  copyright notice). Changed: reads Effect 4's array form `Schedule.max([a, b])` and
+  `Schedule.min([a, b])`, and reads a schedule defined in terms of itself as unknown instead of
+  overflowing the stack.
 - `effect/rules/require-cause-when-narrowing.ts`
-- `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT).
+- `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
+  `effect/LICENSE-enfect`).
 - `effect/shared/effect-modules.ts`, which the four rules share.
 
 To update them, diff those files in the fork from `13b0203`.

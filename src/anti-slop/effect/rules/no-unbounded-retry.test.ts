@@ -39,6 +39,20 @@ tester.run("anti-slop-effect/no-unbounded-retry", noUnboundedRetryRule, {
 		const answer = ask(prompt).pipe(Effect.retry(Schedule.max(Schedule.spaced("1 second"), Schedule.recurs(3))));`,
 		`${imports}
 		const answer = ask(prompt).pipe(Effect.retry(Schedule.recurs(3)), Effect.retry(Schedule.during("1 minute")));`,
+		// Effect 4 combines schedules from one array.
+		`${imports}
+		const answer = ask(prompt).pipe(Effect.retry(Schedule.max([Schedule.spaced("1 second"), Schedule.recurs(3)])));`,
+		`${imports}
+		const answer = ask(prompt).pipe(Effect.retry(Schedule.min([Schedule.recurs(5), Schedule.during("1 minute")])));`,
+		// A schedule the rule can't read, such as one defined in terms of itself, is not reported.
+		`${imports}
+		const schedule = Schedule.upTo(schedule, { times: 3 });
+		const answer = ask(prompt).pipe(Effect.retry(schedule));`,
+		`${imports}
+		const schedule = Schedule.max([schedule, Schedule.spaced("1 second")]);
+		const answer = ask(prompt).pipe(Effect.retry(schedule));`,
+		`${imports}
+		const answer = ask(prompt).pipe(Effect.retry(Schedule.min([...schedules])));`,
 		// A later timeout bounds the elapsed time of the retry.
 		`${imports}
 		const vcs = request.pipe(Effect.retry(Schedule.spaced("10 millis")), Effect.timeout("2 seconds"));`,
@@ -139,6 +153,16 @@ tester.run("anti-slop-effect/no-unbounded-retry", noUnboundedRetryRule, {
 		{
 			code: `${imports}
 			const answer = ask(prompt).pipe(Effect.retry(Schedule.min(Schedule.spaced("1 second"), Schedule.recurs(3))));`,
+			errors: unbounded,
+		},
+		{
+			code: `${imports}
+			const answer = ask(prompt).pipe(Effect.retry(Schedule.min([Schedule.recurs(3), Schedule.spaced("1 second")])));`,
+			errors: unbounded,
+		},
+		{
+			code: `${imports}
+			const answer = ask(prompt).pipe(Effect.retry(Schedule.max([Schedule.spaced("1 second"), Schedule.exponential("1 second")])));`,
 			errors: unbounded,
 		},
 		// A timeout that runs before the retry does not bound it.

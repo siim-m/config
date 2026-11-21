@@ -93,6 +93,11 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// The CLI prints its result.\n// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
       options: taggedOnly,
     },
+    // An empty comment between the reason and the suppression doesn't hide the reason.
+    {
+      code: '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      options: taggedOnly,
+    },
     // A destructured binding exported by name (S14).
     { code: '/** The API. */\nconst { api } = source;\nexport { api };', options: taggedOnly },
     // A reason above a multi-line disable block (S12).

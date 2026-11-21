@@ -35,5 +35,6 @@ tester.run('anti-slop/require-suppression-reason', requireSuppressionReasonRule,
       errors: [lint],
     },
     { code: '// @ts-nocheck\nconst a = 1;', errors: [typescript] },
+    { code: '// @ts-check\n// @ts-expect-error\nconst a: string = 1;', errors: [typescript] },
   ],
 });

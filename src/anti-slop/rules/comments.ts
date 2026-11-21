@@ -168,7 +168,7 @@ function suppressionFollows(
       return false;
     }
     if (SUPPRESSION.test(comment.value)) return true;
-    if (!isDirective(comment)) return false;
+    if (!isDirective(comment) && comment.value.replace(/[\s*]/gu, '') !== '') return false;
     line = comment.loc.end.line;
   }
   return false;
