@@ -2,277 +2,146 @@ import { RuleTester } from 'oxlint/plugins-dev';
 import { commentsRule } from './comments.ts';
 
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: 'ts' } } });
-const budget = [{ maxWords: 4, maxExportDocWords: 6 }];
 const forbidden = [
   {
     forbidden: [{ pattern: '\\b\\d{4}-\\d{2}-\\d{2}\\b', message: 'Leave dates to git.' }],
   },
 ];
-const taggedOnly = [{ policy: 'tagged-only' }];
+const multilineDocs = [{ multilineExportDocs: true }];
 
 tester.run('anti-slop/comments', commentsRule, {
   valid: [
-    // The budget counts words in one comment, and adjacent `//` lines are one comment.
-    { code: '// Four words of why.\nconst a = 1;', options: budget },
-    { code: '/**\n * Four words\n * of why.\n */\nconst a = 1;', options: budget },
-    { code: '// One two.\nconst a = 1;\n// Three four.\n// Five.\nconst b = 2;', options: budget },
-    { code: '/** Six words on an export here. */\nexport const a = 1;', options: budget },
-    // Directives and licence headers don't count.
-    {
-      code: '// oxlint-disable-next-line no-console -- a long reason here\n// Why.\nconst a = 1;',
-      options: budget,
-    },
-    {
-      code: '/*! Copyright 2026 Someone. Licensed under the MIT licence, see LICENSE. */\nconst a = 1;',
-      options: budget,
-    },
+    // The allowed prefixes, directives and licence headers stay.
+    '// SAFETY: the schema checked it.\nconst a = b as C;',
+    '// SYNC: keeps the URL in step.\nuseEffect(() => {});',
+    '// WARNING: the vendor API returns cents.\nconst a = 1;',
+    { code: '// NOTE: kept for the old client.\nconst a = 1;', options: [{ allow: ['NOTE'] }] },
+    '// @ts-expect-error -- the types lag the API\nconst a: string = 1;',
+    '// oxlint-disable-next-line no-console -- a long reason here\nconsole.log(1);',
+    '/*! Copyright 2026 Someone. Licensed under the MIT licence, see LICENSE. */\nconst a = 1;',
+    '// Copyright 2026 Someone. All rights reserved. Licensed under MIT, see LICENSE.\nconst a = 1;',
     '#!/usr/bin/env node\nconst a = 1;',
-    // One issue may be cited; a URL is not an issue.
-    '// Chosen in #12.\nconst a = 1;',
-    '// Source: https://github.com/a/b/issues/34#issuecomment-1\nconst a = 1;',
-    // A task marker with a link to what tracks it.
-    '// TODO(#12): drop once the API returns ids.\nconst a = 1;',
-    // A comment that adds to the name below it.
-    '// Rounded down, because the API truncates.\nconst totalSeconds = 1;',
-    // Prose that reads a little like code.
-    '// Keep a = b here; the parser needs both.\nconst a = 1;',
-    // A JSDoc tag with a description.
-    '/** @param id the row to load, never a draft */\nfunction load(id: string) { return id; }',
-    { code: '// Leave the default.\nconst a = 1;', options: forbidden },
-    // tagged-only keeps directives, licence headers, the allowed prefixes and docs on exports.
-    { code: '// SAFETY: the schema checked it.\nconst a = b as C;', options: taggedOnly },
-    {
-      code: '// WARNING: the vendor API returns\n// cents, not euros.\nconst a = 1;',
-      options: taggedOnly,
-    },
-    { code: '// SYNC: keeps the URL in step.\nuseEffect(() => {});', options: taggedOnly },
-    {
-      code: '// @ts-expect-error -- the types lag the API\nconst a: string = 1;',
-      options: taggedOnly,
-    },
-    { code: '/** A row id. */\nexport type Id = string;', options: taggedOnly },
-    {
-      code: 'export interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}',
-      options: taggedOnly,
-    },
-    {
-      code: 'export class Store {\n  /** Loads one row. */\n  load() {}\n}',
-      options: taggedOnly,
-    },
-    {
-      code: '// NOTE: kept for the old client.\nconst a = 1;',
-      options: [{ policy: 'tagged-only', allow: ['NOTE'] }],
-    },
-    // Exports declared apart from their declaration (S1).
-    { code: '/** Six words on an export here. */\nconst a = 1;\nexport { a };', options: budget },
-    {
-      code: '/** Loads one row. */\nfunction load() {}\nexport default load;',
-      options: taggedOnly,
-    },
-    {
-      code: 'interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}\nexport type { Row };',
-      options: taggedOnly,
-    },
-    // Words such as "creates" and "new" add to a name, and a call is not a declaration (S3).
+    // Issue numbers are fine in a comment that stays.
+    '// WARNING: #12 and #34 both depend on this order.\nconst a = 1;',
+    // Docs on exports stay, including members of an exported type.
+    '/** A row id. */\nexport type Id = string;',
+    '/**\n * A row id.\n */\nexport type Id = string;',
+    'export interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}',
+    'export class Store {\n  /** Loads one row. */\n  load() {}\n}',
     '/** Creates a new user. */\nexport function user() {}',
-    '// Flush pending writes.\nflushPendingWrites();',
-    // A tag's description may continue on the next line (S4).
-    '/**\n * @param id\n *   the row to load\n */\nfunction load(id: string) { return id; }',
-    // A licence header at the top of a file (S5).
+    // Exports declared apart from their declaration.
+    '/** Loads one row. */\nfunction load() {}\nexport default load;',
+    'interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}\nexport type { Row };',
+    '/** The API. */\nconst { api } = source;\nexport { api };',
+    // multilineExportDocs lets an export's doc run to more lines and words.
     {
-      code: '// Copyright 2026 Someone. All rights reserved. Licensed under MIT, see LICENSE.\nconst a = 1;',
-      options: budget,
+      code: '/**\n * Loads one row.\n *\n * @param id the row to load, never a draft\n */\nexport function load(id: string) { return id; }',
+      options: multilineDocs,
     },
-    // The reason above a suppression is what require-suppression-reason asks for (G1).
-    {
-      code: '// The CLI prints its result.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
-      options: taggedOnly,
-    },
-    // A reason above other directives above a suppression still explains it (S12).
-    {
-      code: '// The CLI prints its result.\n// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
-      options: taggedOnly,
-    },
-    // An empty comment between the reason and the suppression doesn't hide the reason.
-    {
-      code: '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
-      options: taggedOnly,
-    },
-    // A glob is not a divider, a tracker key is a link, and a trailing comment belongs to its line.
-    '// **/*.test.ts files run in node.\nconst a = 1;',
-    '// TODO(ENG-123): drop once the API returns ids.\nconst a = 1;',
-    'const a = 1; // total seconds\nconst totalSeconds = 2;',
+    // The reason above a suppression is what require-suppression-reason asks for.
+    '// The CLI prints its result.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+    '// The CLI prints its result.\n// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+    '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+    '// The CLI prints its result.\nconsole.log(1); // oxlint-disable-line no-console',
+    '// Scripts print.\n/* oxlint-disable\n   no-console */\nconsole.log(1);',
     // Forbidden patterns skip URLs.
     {
-      code: '// See https://example.com/2026-11-20/notes for why.\nconst a = 1;',
+      code: '// WARNING: https://example.com/2026-11-20/notes explains it.\nconst a = 1;',
       options: forbidden,
-    },
-    // The reason above a line that ends in a disable explains it.
-    {
-      code: '// The CLI prints its result.\nconsole.log(1); // oxlint-disable-line no-console',
-      options: taggedOnly,
-    },
-    // A markdown heading in a doc comment is not a divider.
-    '/**\n * Loads a row.\n *\n * ### Example\n * load(1)\n */\nfunction load(id: number) { return id; }',
-    '/**\n * Loads a row.\n *\n * ### `load(1)`\n */\nfunction load(id: number) { return id; }',
-    // A placeholder such as XXX-XXX-XXXX is not a task marker.
-    '// Phone numbers look like XXX-XXX-XXXX.\nconst a = 1;',
-    // A destructured binding exported by name (S14).
-    { code: '/** The API. */\nconst { api } = source;\nexport { api };', options: taggedOnly },
-    // A reason above a multi-line disable block (S12).
-    {
-      code: '// Scripts print.\n/* oxlint-disable\n   no-console */\nconsole.log(1);',
-      options: taggedOnly,
     },
   ],
   invalid: [
-    {
-      code: '// One two three four five.\nconst a = 1;',
-      options: budget,
-      errors: [{ messageId: 'tooLong' }],
-    },
-    {
-      code: '// One two three.\n// Four five.\nconst a = 1;',
-      options: budget,
-      errors: [{ messageId: 'tooLong' }],
-    },
-    {
-      code: '/** Five words, but not exported. */\nconst a = 1;',
-      options: budget,
-      errors: [{ messageId: 'tooLong' }],
-    },
-    {
-      code: '/** Seven words here, even on an export. */\nexport const a = 1;',
-      options: budget,
-      errors: [{ messageId: 'tooLong' }],
-    },
-    { code: '// From #12, #34.\nconst a = 1;', errors: [{ messageId: 'issueChain' }] },
-    {
-      code: '// Changed on 2026-11-20.\nconst a = 1;',
-      options: forbidden,
-      errors: [{ messageId: 'forbidden' }],
-    },
-    { code: '// ---- Helpers ----\nconst a = 1;', errors: [{ messageId: 'divider' }] },
-    { code: '// =========\nconst a = 1;', errors: [{ messageId: 'divider' }] },
-    {
-      code: '// ═══════\n// Time series\n// ═══════\nconst timeSeries = 1;',
-      errors: [{ messageId: 'divider' }],
-    },
-    {
-      code: '// const old = load();\n// save(old);\nconst a = 1;',
-      errors: [{ messageId: 'commentedOutCode' }],
-    },
-    { code: '// Load the user.\nfunction loadUser() {}', errors: [{ messageId: 'restatesName' }] },
-    {
-      code: '// The total seconds\nconst totalSeconds = 1;',
-      errors: [{ messageId: 'restatesName' }],
-    },
-    { code: '// TODO: handle errors\nconst a = 1;', errors: [{ messageId: 'untrackedTask' }] },
-    {
-      code: '/** @param {string} id the row */\nfunction load(id: string) { return id; }',
-      errors: [{ messageId: 'jsdocType' }],
-    },
-    {
-      code: '/**\n * Loads a row.\n * @returns\n */\nfunction load() {}',
-      errors: [{ messageId: 'emptyJsdocTag' }],
-    },
-    {
-      code: "test('x', () => {\n  // Arrange\n  const a = 1;\n});",
-      errors: [{ messageId: 'stepLabel' }],
-    },
-    // tagged-only reports any other comment.
-    {
-      code: '// Because the API truncates.\nconst a = 1;',
-      options: taggedOnly,
-      errors: [{ messageId: 'untagged' }],
-    },
-    {
-      code: '/** Loads one row. */\nfunction load() {}',
-      options: taggedOnly,
-      errors: [{ messageId: 'untagged' }],
-    },
+    // Any other comment goes.
+    { code: '// Because the API truncates.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
+    { code: '/** Loads one row. */\nfunction load() {}', errors: [{ messageId: 'untagged' }] },
+    { code: '// TODO(#12): drop the shim.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
     {
       code: 'interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}',
-      options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
     },
-    {
-      code: '// SAFETY:\nconst a = b as C;',
-      options: taggedOnly,
-      errors: [{ messageId: 'untagged' }],
-    },
-    // The budget still applies to an allowed comment.
-    {
-      code: '// SAFETY: one two three four.\nconst a = b as C;',
-      options: [{ policy: 'tagged-only', maxWords: 4 }],
-      errors: [{ messageId: 'tooLong' }],
-    },
-    // Inside an exported function's body is not the export's API (S2).
+    { code: '// SAFETY:\nconst a = b as C;', errors: [{ messageId: 'untagged' }] },
+    // Inside an exported function's body is not the export's API.
     {
       code: 'export const run = () => configure({ /** Why. */ debug: true });',
-      options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
     },
-    // "Copyright" in prose is not a licence header (S5).
-    {
-      code: 'const a = 1;\n// Respect the copyright of the feed.\nconst b = 2;',
-      options: budget,
-      errors: [{ messageId: 'tooLong' }],
-    },
-    // A directive ends a comment, so a tagged line above it can't carry the line below (S6).
-    {
-      code: '// SAFETY: fine.\n// oxlint-disable-next-line no-console -- logs\n// Unrelated chatter.\nconsole.log(1);',
-      options: taggedOnly,
-      errors: [{ messageId: 'untagged' }],
-    },
-    // Exporting a parameter's namesake or a sibling binding exports nothing else (S11).
+    // Exporting a parameter's namesake or a sibling binding exports nothing else.
     {
       code: '/** Waits. */\nfunction delay(retries: number) { return retries; }\nconst retries = 1;\nexport { retries };',
-      options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
     },
     {
       code: 'const a = {}, b = {\n  /** Hidden. */\n  c: 1,\n};\nexport { a };',
-      options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
     },
-    // A trailing comment is not a reason, as require-suppression-reason holds (S12).
+    // "Copyright" in prose after the code starts is not a licence header.
+    {
+      code: 'const a = 1;\n// Respect the copyright of the feed.\nconst b = 2;',
+      errors: [{ messageId: 'untagged' }],
+    },
+    // Prose that starts with a tool's name is not a directive.
+    { code: '// eslint config: the base preset sets these.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
+    // A directive ends a comment, so a tagged line above it can't carry the line below.
+    {
+      code: '// SAFETY: fine.\n// oxlint-disable-next-line no-console -- logs\n// Unrelated chatter.\nconsole.log(1);',
+      errors: [{ messageId: 'untagged' }],
+    },
+    // A trailing comment is not a reason, and a trailing directive doesn't carry one down.
     {
       code: 'start(); // Starts it.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
-      options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
     },
-    // Prose that starts with a tool's name is not a directive, so it counts.
     {
-      code: '// eslint-plugin-foo reports this\n// one two three.\nconst a = 1;',
-      options: [{ maxWords: 5 }],
-      errors: [{ messageId: 'tooLong' }],
+      code: '// Starts it.\nstart(); // prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      errors: [{ messageId: 'untagged' }],
     },
-    // Prose about eslint config is not a directive.
+    // A comment that stays gets one line.
     {
-      code: '// eslint config: the base preset sets these.\nconst a = 1;',
+      code: '// WARNING: the vendor API returns\n// cents, not euros.\nconst a = 1;',
+      errors: [{ messageId: 'multiLine' }],
+    },
+    {
+      code: '/* SAFETY: the schema\n   checked it. */\nconst a = b as C;',
+      errors: [{ messageId: 'multiLine' }],
+    },
+    {
+      code: '// The CLI prints\n// its result.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
+      errors: [{ messageId: 'multiLine' }],
+    },
+    {
+      code: '/**\n * Loads one row.\n *\n * @param id the row to load\n */\nexport function load(id: string) { return id; }',
+      errors: [{ messageId: 'multiLine' }],
+    },
+    // And a word limit, since a formatter doesn't wrap comments.
+    {
+      code: '// SAFETY: one two three four.\nconst a = b as C;',
       options: [{ maxWords: 4 }],
       errors: [{ messageId: 'tooLong' }],
     },
-    // TODO next to a hyphen is still a task marker.
-    { code: '// TODO-remove this\nconst a = 1;', errors: [{ messageId: 'untrackedTask' }] },
-    // A heading is exempt only in a doc comment.
-    { code: '/* ### Helpers ### */\nconst a = 1;', errors: [{ messageId: 'divider' }] },
-    // Enum members are names too (S13).
     {
-      code: "enum State {\n  /** Ready. */\n  Ready = 'ready',\n}",
+      code: '/** One two three four five. */\nexport const a = 1;',
+      options: [{ maxWords: 4 }],
+      errors: [{ messageId: 'tooLong' }],
+    },
+    // An export's doc that only repeats the name says nothing.
+    { code: '/** Load the user. */\nexport function loadUser() {}', errors: [{ messageId: 'restatesName' }] },
+    {
+      code: '/** The total seconds */\nexport const totalSeconds = 1;',
       errors: [{ messageId: 'restatesName' }],
     },
-    // Quoted enum member names count (S13).
     {
-      code: "enum State {\n  /** In progress. */\n  'in-progress' = 1,\n}",
+      code: "export enum State {\n  /** In progress. */\n  'in-progress' = 1,\n}",
       errors: [{ messageId: 'restatesName' }],
     },
-    // A trailing directive doesn't carry a reason down to a suppression (S12).
     {
-      code: '// Starts it.\nstart(); // prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
-      options: taggedOnly,
-      errors: [{ messageId: 'untagged' }],
+      code: '/**\n * Load the user.\n */\nexport function loadUser() {}',
+      options: multilineDocs,
+      errors: [{ messageId: 'restatesName' }],
+    },
+    {
+      code: '// WARNING: changed on 2026-11-20.\nconst a = 1;',
+      options: forbidden,
+      errors: [{ messageId: 'forbidden' }],
     },
   ],
 });
