@@ -48,6 +48,16 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
     `import type { Person } from './person';
     class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
     const isGuest = (person: Person) => person.id === '';`,
+    // A data-only service's instance is that data too.
+    `class Person extends Schema.Class<Person>('Person')({ id: Schema.String }) {}
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const audit = (person: CurrentPerson['Service']) => person.id;`,
+    `class CurrentUser extends Context.Service<CurrentUser, { readonly id: string }>()('CurrentUser') {}
+    const audit = (user: CurrentUser['Service']) => user.id;`,
+    // Only an Effect service factory names a service's shape.
+    `interface Props { onSave(): void }
+    class Form extends component<Form, Props>() {}
+    const render = (props: Props) => props.onSave();`,
   ],
   invalid: [
     {
@@ -102,6 +112,46 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       export class Store extends Context.Service<Store, CachedStoreShape>()('app/Store') {}
       const load = (store: CachedStoreShape, id: string) => store.find(id);`,
       errors: [{ ...error, data: { parameter: 'store', service: 'Store' } }],
+    },
+    {
+      // A shape whose members the rule can't see stays a service.
+      code: `const make = Effect.gen(function* () { return { send: (to: string) => Effect.void } });
+      type MailerShape = Effect.Success<typeof make>;
+      export class Mailer extends Context.Service<Mailer, MailerShape>()('app/Mailer') {}
+      const notify = (mailer: MailerShape) => mailer.send('a');`,
+      errors: [{ ...error, data: { parameter: 'mailer', service: 'Mailer' } }],
+    },
+    {
+      // Operations behind a local alias or in a nested object.
+      code: `type Send = (to: string) => Effect.Effect<void>;
+      interface SmsShape { readonly send: Send }
+      interface RepoShape { readonly users: { readonly find: (id: string) => Effect.Effect<User> } }
+      export class Sms extends Context.Service<Sms, SmsShape>()('app/Sms') {}
+      export class Repo extends Context.Service<Repo, RepoShape>()('app/Repo') {}
+      const text = (sms: SmsShape, repo: RepoShape) => sms.send('a');`,
+      errors: [
+        { ...error, data: { parameter: 'sms', service: 'Sms' } },
+        { ...error, data: { parameter: 'repo', service: 'Repo' } },
+      ],
+    },
+    {
+      // Effect 3's Context.Tag, and a default-exported service.
+      code: `interface CacheOps { get(key: string): Effect.Effect<string> }
+      interface MailOps { send(): Effect.Effect<void> }
+      class Cache extends Context.Tag('app/Cache')<Cache, CacheOps>() {}
+      export default class Mailer extends Context.Service<Mailer, MailOps>()('app/Mailer') {}
+      const read = (cache: CacheOps, mail: MailOps) => cache.get('a');`,
+      errors: [
+        { ...error, data: { parameter: 'cache', service: 'Cache' } },
+        { ...error, data: { parameter: 'mail', service: 'Mailer' } },
+      ],
+    },
+    {
+      // An exempt service doesn't hide another one beside it.
+      code: `import type { AllowedShape, MailerShape } from './services';
+      const notify = (both: AllowedShape & MailerShape) => both.send();`,
+      options: [{ exempt: ['Allowed'] }],
+      errors: [{ ...error, data: { parameter: 'both', service: 'Mailer' } }],
     },
     {
       // Part of a service is still the service.
