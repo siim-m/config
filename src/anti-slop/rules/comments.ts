@@ -13,6 +13,8 @@ const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
 const SUPPRESSION =
   /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics(?:-next-line)?\s.*:(?:off|skip-file)\b|svelte-ignore\b)/u;
+/** A one-word block comment before a template literal, such as `glsl`, that tells editors how to highlight it. */
+const LANGUAGE_HINT = /^\s*[a-z][\w-]*\s*$/iu;
 const isDoc = (comment: Comment): boolean =>
   comment.type === 'Block' && comment.value.startsWith('*');
 
@@ -251,6 +253,7 @@ export const commentsRule = defineRule({
       );
     const prefixes = options.allow.map((prefix) => `\`${prefix}:\``).join(', ');
     const members: ESTree.Node[] = [];
+    const templates = new Set<number>();
     const collect = (node: ESTree.Node) => {
       members.push(node);
     };
@@ -280,6 +283,9 @@ export const commentsRule = defineRule({
       PropertyDefinition: collect,
       MethodDefinition: collect,
       Property: collect,
+      TemplateLiteral(node) {
+        templates.add(node.start);
+      },
       TSUnionType(node) {
         members.push(...node.types);
       },
@@ -311,6 +317,13 @@ export const commentsRule = defineRule({
             (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
           const lines = group.flatMap(textLines);
           if (licence || lines.length === 0) continue;
+          const languageHint =
+            group.length === 1 &&
+            first.type === 'Block' &&
+            !isDoc(first) &&
+            LANGUAGE_HINT.test(first.value) &&
+            templates.has(sourceCode.getTokenAfter(first)?.start ?? -1);
+          if (languageHint) continue;
           const kind = exportDocs.has(first.start)
             ? 'exportDoc'
             : ownLine(first) && suppressionFollows(groups, index, ownLine)

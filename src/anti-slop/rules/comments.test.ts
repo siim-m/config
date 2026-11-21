@@ -16,6 +16,10 @@ tester.run('anti-slop/comments', commentsRule, {
     '/*! Copyright 2026 Someone. Licensed under the MIT licence, see LICENSE. */\nconst a = 1;',
     '// Copyright 2026 Someone. All rights reserved. Licensed under MIT, see LICENSE.\nconst a = 1;',
     '#!/usr/bin/env node\nconst a = 1;',
+    // A one-word language hint before a template literal tells editors how to highlight it.
+    'const shader = /* glsl */ `void main() {}`;',
+    'const view = /*html*/`<p></p>`;',
+    'const query =\n  /* sql */\n  `select 1`;',
     // Issue numbers are fine in a comment that stays.
     '// WARNING: #12 and #34 both depend on this order.\nconst a = 1;',
     // Docs on exports stay, including members of an exported type.
@@ -94,6 +98,12 @@ tester.run('anti-slop/comments', commentsRule, {
       code: 'const a = 1;\n// Respect the copyright of the feed.\nconst b = 2;',
       errors: [{ messageId: 'untagged' }],
     },
+    // Anything more than that is a comment.
+    { code: 'const shader = /* glsl shader */ `void main() {}`;', errors: [{ messageId: 'untagged' }] },
+    { code: 'const shader = /** glsl */ `void main() {}`;', errors: [{ messageId: 'untagged' }] },
+    { code: 'const shader = // glsl\n  `void main() {}`;', errors: [{ messageId: 'untagged' }] },
+    { code: '/* glsl */ const a = 1;', errors: [{ messageId: 'untagged' }] },
+    { code: 'const shader = /* glsl */ glsl`void main() {}`;', errors: [{ messageId: 'untagged' }] },
     // Prose that starts with a tool's name is not a directive.
     { code: '// eslint config: the base preset sets these.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
     // A directive ends a comment, so a tagged line above it can't carry the line below.
