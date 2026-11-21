@@ -31,19 +31,20 @@ installed, or `oxlint-tsgolint` in its place. Either one only backs the lint rul
 project's own `tsc` or `@effect/tsgo` typecheck. For ts-reset's stricter built-in types, add
 `import '@siim-m/config/reset.d.ts';` to a `.d.ts` file in the project.
 
-A disable comment or `@ts-expect-error` must say why, after `--` or on the line above
-(`anti-slop/require-suppression-reason`). The type-assertion rules can't be disabled inline at all;
-turn one off for a file in the lint config instead (`anti-slop/no-disabled-type-assertion-rules`). A
-file-wide or same-line disable that names no rule, or that names one of these two checks, silences
-them too, and oxlint gives a rule no way to report that, so catch one in review.
+A disable comment or `@ts-expect-error` must say why: after `--` (or, for a `@ts-` directive,
+anywhere after it), or on the line above (`anti-slop/require-suppression-reason`). The
+type-assertion rules can't be disabled inline at all; turn one off for a file in the lint config
+instead (`anti-slop/no-disabled-type-assertion-rules`). A file-wide or same-line disable that names
+no rule, or that names one of these two checks, silences them too, and oxlint gives a rule no way to
+report that, so catch one in review.
 
 ## Comments
 
 `anti-slop/comments` holds a comment to a short why. By default a comment gets 30 words, a doc
 comment on an export 45, and it may cite one issue. It also reports section dividers, test step
-labels, commented-out code, TODOs without a link, JSDoc types in TypeScript, JSDoc tags with nothing
-after them, and comments that only repeat the name below them. `forbidden` adds patterns of your
-own:
+labels, commented-out code, TODOs without a link, JSDoc types in TypeScript, empty `@param` and
+`@returns` tags, and comments that only repeat the name below them. `forbidden` adds patterns of
+your own:
 
 ```ts
 'anti-slop/comments': ['error', {

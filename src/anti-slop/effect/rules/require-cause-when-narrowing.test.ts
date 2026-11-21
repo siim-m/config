@@ -25,6 +25,13 @@ tester.run("anti-slop-effect/require-cause-when-narrowing", requireCauseWhenNarr
 			const ref = yield* Ref.make(0);
 			return yield* Ref.get(ref);
 		})));`,
+		// Effect's own constructors build values, not errors.
+		`${imports}
+		import { Ref } from "effect";
+		const a = fetchUser(id).pipe(Effect.catch(() => Ref.make(0)));
+		const b = fetchUser(id).pipe(Effect.catch(() => Effect.gen(function* () {
+			return yield* Ref.make(0);
+		})));`,
 		// A data-first source built with a tap counts too.
 		`${imports}
 		const a = Effect.mapError(decode(text).pipe(Effect.tapError(Effect.logError)), () => new Failed());

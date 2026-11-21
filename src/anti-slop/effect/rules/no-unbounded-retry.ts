@@ -63,6 +63,8 @@ function constInitializer(sourceCode: SourceCode, identifier: ESTree.IdentifierR
 	if (variable === null || variable.defs.length !== 1) return null;
 	const [definition] = variable.defs;
 	if (definition?.type !== "Variable" || definition.node.type !== "VariableDeclarator") return null;
+	// A destructured binding is one part of its initializer, not all of it.
+	if (definition.node.id.type !== "Identifier") return null;
 	if (definition.parent?.type !== "VariableDeclaration" || definition.parent.kind !== "const") return null;
 	return definition.node.init ?? null;
 }
@@ -291,7 +293,7 @@ export const noUnboundedRetryRule = defineRule({
 		},
 		messages: {
 			unboundedRetry:
-				"This retry never gives up. Bound it with `times`, `Schedule.upTo({ times })` or `Schedule.upTo({ duration })`, `Schedule.max([schedule, Schedule.recurs(n)])`, or a later `Effect.timeout`.",
+				"This retry has no limit on attempts or time. Bound it with `times`, `Schedule.upTo({ times })` or `Schedule.upTo({ duration })`, `Schedule.max([schedule, Schedule.recurs(n)])`, or a later `Effect.timeout`.",
 		},
 	},
 	create(context) {

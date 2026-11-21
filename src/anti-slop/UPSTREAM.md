@@ -37,13 +37,18 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
   separate rule names as commas do.
 - `effect/rules/no-ordie-in-service-construction.ts`
 - `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT, which ships no
-  copyright notice). Changed: reads Effect 4's array form `Schedule.max([a, b])` and
-  `Schedule.min([a, b])`; reads a schedule defined in terms of itself, or passed through a
-  combinator it doesn't know such as `Schedule.while`, as unknown; treats `times: undefined` as no
-  limit; reports options with no `schedule` and no `times`, which retry on `Schedule.forever`; and reads `Schedule.concatResult` like `concat`.
+  copyright notice). Changed:
+  - reads Effect 4's array form `Schedule.max([a, b])` and `Schedule.min([a, b])`;
+  - reads a schedule defined in terms of itself, a destructured binding, or a schedule passed
+    through a combinator it doesn't know, such as `Schedule.while`, as unknown;
+  - treats `times: undefined` as no limit, and reports options with no `schedule` and no `times`,
+    which retry on `Schedule.forever`;
+  - reads `Schedule.concatResult` like `concat`;
+  - says "no limit on attempts or time" rather than "never gives up".
 - `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
-  `.pipe(Effect.tapError(...))` counts as logged, and a yielded value bound to a name, such as
-  `const ref = yield* Ref.make(0)`, is not a constructed error.
+  `.pipe(Effect.tapError(...))` counts as logged; neither a yielded value bound to a name, such as
+  `const ref = yield* Ref.make(0)`, nor a `make` of something imported from Effect, such as
+  `Ref.make(0)`, is a constructed error.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
   `effect/LICENSE-enfect`).
 - `effect/shared/effect-modules.ts`, which the four rules share.

@@ -53,6 +53,10 @@ tester.run("anti-slop-effect/no-unbounded-retry", noUnboundedRetryRule, {
 		const answer = ask(prompt).pipe(Effect.retry(schedule));`,
 		`${imports}
 		const answer = ask(prompt).pipe(Effect.retry(Schedule.min([...schedules])));`,
+		// A destructured policy is one part of its initializer.
+		`${imports}
+		const { retryPolicy } = { retryPolicy: { times: 3 } };
+		const answer = Effect.retry(load, retryPolicy);`,
 		// A combinator the rule doesn't know may stop the schedule.
 		`${imports}
 		const answer = ask(prompt).pipe(Effect.retry(Schedule.forever.pipe(Schedule.while(({ attempt }) => attempt < 3))));`,

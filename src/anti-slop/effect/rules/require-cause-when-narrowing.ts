@@ -1,5 +1,6 @@
 // Changed from the fork: a data-first source built with `.pipe(Effect.tapError(...))` counts as logged, and a
-// yielded value bound to a name, such as `const ref = yield* Ref.make(0)`, is not a constructed error.
+// yielded value bound to a name, such as `const ref = yield* Ref.make(0)`, or a `make` of something imported from
+// Effect, such as `Ref.make(0)`, is not a constructed error.
 import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
@@ -39,8 +40,24 @@ function ignoresError(handler: FunctionNode, sourceCode: SourceCode): boolean {
 	return variable !== undefined && variable.references.length === 0;
 }
 
-/** `new X(...)` or `X.make(...)` for a capitalized `X` that is not an Effect module. */
-function isErrorConstruction(node: ESTree.Node, names: EffectModuleNames): node is ESTree.NewExpression | ESTree.CallExpression {
+/** The local names a file imports from Effect's packages, such as `Ref` or `Queue`, whose `make` builds a value. */
+function effectImports(program: ESTree.Program): ReadonlySet<string> {
+	const locals = new Set<string>();
+	for (const statement of program.body) {
+		if (statement.type !== "ImportDeclaration") continue;
+		const source = statement.source.value;
+		if (source !== "effect" && !source.startsWith("effect/") && !source.startsWith("@effect/")) continue;
+		for (const specifier of statement.specifiers) locals.add(specifier.local.name);
+	}
+	return locals;
+}
+
+/** `new X(...)` or `X.make(...)` for a capitalized `X` that is not imported from Effect. */
+function isErrorConstruction(
+	node: ESTree.Node,
+	names: EffectModuleNames,
+	imported: ReadonlySet<string>,
+): node is ESTree.NewExpression | ESTree.CallExpression {
 	if (node.type === "NewExpression") return unwrapNode(node.callee).type === "Identifier" || unwrapNode(node.callee).type === "MemberExpression";
 	if (node.type !== "CallExpression") return false;
 	const callee = unwrapNode(node.callee);
@@ -55,6 +72,7 @@ function isErrorConstruction(node: ESTree.Node, names: EffectModuleNames): node 
 	const owner = unwrapNode(callee.object);
 	const ownerName = owner.type === "Identifier" ? owner.name : owner.type === "MemberExpression" && owner.property.type === "Identifier" ? owner.property.name : null;
 	if (ownerName === null || !/^[A-Z]/u.test(ownerName)) return false;
+	if (owner.type === "Identifier" && imported.has(owner.name)) return false;
 	return !effectModuleNamesList.some((module) => moduleMemberName(callee, names, module) !== null);
 }
 
@@ -72,7 +90,11 @@ function passesCause(node: ESTree.NewExpression | ESTree.CallExpression): boolea
 }
 
 /** The constructed errors a handler produces without descending into nested functions. */
-function constructedErrors(handler: FunctionNode, names: EffectModuleNames): readonly (ESTree.NewExpression | ESTree.CallExpression)[] {
+function constructedErrors(
+	handler: FunctionNode,
+	names: EffectModuleNames,
+	imported: ReadonlySet<string>,
+): readonly (ESTree.NewExpression | ESTree.CallExpression)[] {
 	const found: (ESTree.NewExpression | ESTree.CallExpression)[] = [];
 	const consider = (node: ESTree.Node) => {
 		const expression = unwrapNode(node);
@@ -80,7 +102,7 @@ function constructedErrors(handler: FunctionNode, names: EffectModuleNames): rea
 			consider(expression.argument);
 			return;
 		}
-		if (isErrorConstruction(expression, names)) found.push(expression);
+		if (isErrorConstruction(expression, names, imported)) found.push(expression);
 	};
 	for (const returned of returnedExpressions(handler)) consider(returned);
 	if (handler.body === null) return found;
@@ -134,6 +156,7 @@ export const requireCauseWhenNarrowingRule = defineRule({
 	},
 	create(context) {
 		const names = collectEffectModuleNames(context.sourceCode.ast);
+		const imported = effectImports(context.sourceCode.ast);
 
 		return {
 			CallExpression(node) {
@@ -142,7 +165,7 @@ export const requireCauseWhenNarrowingRule = defineRule({
 				const handler = node.arguments.at(-1);
 				if (handler === undefined || !isFunction(handler)) return;
 				if (!ignoresError(handler, context.sourceCode)) return;
-				const constructed = constructedErrors(handler, names).find((construction) => !passesCause(construction));
+				const constructed = constructedErrors(handler, names, imported).find((construction) => !passesCause(construction));
 				if (constructed === undefined) return;
 				const dataFirstSource = node.arguments.length > 1 ? node.arguments[0] : undefined;
 				const earlier = dataFirstSource === undefined ? precedingSteps(node) : sourceSteps(dataFirstSource);
