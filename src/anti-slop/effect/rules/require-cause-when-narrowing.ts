@@ -40,8 +40,10 @@ function ignoresError(handler: FunctionNode, sourceCode: SourceCode): boolean {
 	return variable !== undefined && variable.references.length === 0;
 }
 
-/** Effect modules whose `make` builds a value, such as a `Ref` or a `Queue`, rather than an error. */
-// From Effect 3 and 4: the modules that export a `make` and are not errors.
+/**
+ * Effect 3 and 4 modules whose `make` builds a value, such as a `Ref` or a `Queue`, rather than an error.
+ * Not exhaustive: for a module missing here, suppress with a reason.
+ */
 const valueModules: ReadonlySet<string> = new Set([
 	"Array",
 	"BigDecimal",
