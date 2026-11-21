@@ -79,11 +79,13 @@ config that still names the old rule, so rename or remove it there.
 `anti-slop-effect/no-service-parameters` reports a function parameter typed as a service, such as
 `(mailer: MailerShape, to: string) => mailer.send(to)`. Get the service from context where the
 caller is built instead. A function may still take a service's shape when the file shows it's plain
-data, such as a signed-in user built from `Schema.Struct` or `Schema.Class`, with no members typed
-as functions, Effects, Streams or Refs. A `Schema.Class` may keep helper methods that don't return
-an Effect or a Stream. A shape the rule can't see into, such as `Effect.Success<typeof make>`, stays
-a service, and a parameter typed by an imported name counts only when the name ends in `Shape`. List
-services that callers may pass along anyway, such as request context, in `exempt`.
+data, such as a signed-in user built from `Schema.Struct` or `Schema.Class`. An interface or object
+type is data when none of its members is typed as a function, an Effect, a Stream or a Ref. A
+`Schema.Class` or `Data.Class` is data when none of its methods, getters or fields returns, holds or
+is typed as one of those, so it may keep helpers such as `isAdmin()`. A shape the rule can't see
+into, such as `Effect.Success<typeof make>`, stays a service, and a parameter typed by an imported
+name counts only when the name ends in `Shape`. List services that callers may pass along anyway,
+such as request context, in `exempt`.
 
 ## Tests and shortcuts
 

@@ -203,7 +203,7 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       class Ledger extends Schema.Class<Ledger>('Ledger')({ id: Schema.String }) {
         send(ok: boolean) {
           if (ok) {
-            return ok ? Effect.log(this.id) : Effect.never;
+            return this.id === '' ? null : Effect.log(this.id);
           }
           return null;
         }

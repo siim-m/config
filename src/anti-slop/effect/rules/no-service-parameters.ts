@@ -163,11 +163,11 @@ function isDataClass(node: ESTree.Class): boolean {
   let callee = node.superClass;
   while (callee?.type === 'CallExpression') callee = callee.callee;
   return (
-    !node.body.body.some(isClassOperation) &&
     callee?.type === 'MemberExpression' &&
     callee.object.type === 'Identifier' &&
     DATA_CLASS_MODULES.has(callee.object.name) &&
-    DATA_CLASS_FACTORIES.has(propertyName(callee) ?? '')
+    DATA_CLASS_FACTORIES.has(propertyName(callee) ?? '') &&
+    !node.body.body.some(isClassOperation)
   );
 }
 
