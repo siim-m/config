@@ -32,6 +32,9 @@ tester.run("anti-slop-effect/require-cause-when-narrowing", requireCauseWhenNarr
 		const b = fetchUser(id).pipe(Effect.catch(() => Effect.gen(function* () {
 			return yield* Ref.make(0);
 		})));`,
+		`${imports}
+		import * as Queue from "effect/Queue";
+		const a = fetchUser(id).pipe(Effect.catch(() => Queue.make()));`,
 		// A data-first source built with a tap counts too.
 		`${imports}
 		const a = Effect.mapError(decode(text).pipe(Effect.tapError(Effect.logError)), () => new Failed());
@@ -51,6 +54,13 @@ tester.run("anti-slop-effect/require-cause-when-narrowing", requireCauseWhenNarr
 		const a = load.pipe(Effect.mapError(() => new Failed()));`,
 	],
 	invalid: [
+		// An error schema imported from Effect is still an error.
+		{
+			code: `${imports}
+			import { HttpClientErrorSchema } from "effect/http/HttpClientError";
+			const a = Effect.mapError(load, () => HttpClientErrorSchema.make({ kind: "TransportError" }));`,
+			errors: [missingCause("Effect.mapError", "HttpClientErrorSchema")],
+		},
 		{
 			code: `${imports}
 			const a = decode(text).pipe(Effect.mapError(() => BadRequest.make({ reason: "Invalid JSON" })));`,

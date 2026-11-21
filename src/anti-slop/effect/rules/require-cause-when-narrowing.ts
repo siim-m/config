@@ -1,6 +1,6 @@
 // Changed from the fork: a data-first source built with `.pipe(Effect.tapError(...))` counts as logged, and a
-// yielded value bound to a name, such as `const ref = yield* Ref.make(0)`, or a `make` of something imported from
-// Effect, such as `Ref.make(0)`, is not a constructed error.
+// yielded value bound to a name, such as `const ref = yield* Ref.make(0)`, or the `make` of an Effect value module,
+// such as `Ref.make(0)`, is not a constructed error.
 import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
@@ -40,19 +40,60 @@ function ignoresError(handler: FunctionNode, sourceCode: SourceCode): boolean {
 	return variable !== undefined && variable.references.length === 0;
 }
 
-/** The local names a file imports from Effect's packages, such as `Ref` or `Queue`, whose `make` builds a value. */
+/** Effect modules whose `make` builds a value, such as a `Ref` or a `Queue`, rather than an error. */
+const valueModules: ReadonlySet<string> = new Set([
+	"BigDecimal",
+	"Cache",
+	"Chunk",
+	"DateTime",
+	"Deferred",
+	"Duration",
+	"FiberHandle",
+	"FiberMap",
+	"FiberSet",
+	"HashMap",
+	"HashSet",
+	"Latch",
+	"List",
+	"Mailbox",
+	"MutableHashMap",
+	"MutableHashSet",
+	"MutableList",
+	"MutableRef",
+	"Pool",
+	"PubSub",
+	"Queue",
+	"RcMap",
+	"RcRef",
+	"Redacted",
+	"Ref",
+	"Scope",
+	"Semaphore",
+	"SortedMap",
+	"SortedSet",
+	"SubscriptionRef",
+	"SynchronizedRef",
+]);
+
+/** The local names a file binds to Effect's value modules: `import { Ref } from "effect"` or `import * as Ref from "effect/Ref"`. */
 function effectImports(program: ESTree.Program): ReadonlySet<string> {
 	const locals = new Set<string>();
 	for (const statement of program.body) {
 		if (statement.type !== "ImportDeclaration") continue;
 		const source = statement.source.value;
-		if (source !== "effect" && !source.startsWith("effect/") && !source.startsWith("@effect/")) continue;
-		for (const specifier of statement.specifiers) locals.add(specifier.local.name);
+		for (const specifier of statement.specifiers) {
+			if (source === "effect" && specifier.type === "ImportSpecifier") {
+				const name = specifier.imported.type === "Identifier" ? specifier.imported.name : specifier.imported.value;
+				if (valueModules.has(name)) locals.add(specifier.local.name);
+			} else if (source.startsWith("effect/") && specifier.type !== "ImportSpecifier") {
+				if (valueModules.has(source.slice("effect/".length))) locals.add(specifier.local.name);
+			}
+		}
 	}
 	return locals;
 }
 
-/** `new X(...)` or `X.make(...)` for a capitalized `X` that is not imported from Effect. */
+/** `new X(...)` or `X.make(...)` for a capitalized `X` that is not an Effect module. */
 function isErrorConstruction(
 	node: ESTree.Node,
 	names: EffectModuleNames,

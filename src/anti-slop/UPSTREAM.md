@@ -47,8 +47,8 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
   - says "no limit on attempts or time" rather than "never gives up".
 - `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
   `.pipe(Effect.tapError(...))` counts as logged; neither a yielded value bound to a name, such as
-  `const ref = yield* Ref.make(0)`, nor a `make` of something imported from Effect, such as
-  `Ref.make(0)`, is a constructed error.
+  `const ref = yield* Ref.make(0)`, nor the `make` of an Effect value module, such as
+  `Ref.make(0)` or `Queue.make()`, is a constructed error.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
   `effect/LICENSE-enfect`).
 - `effect/shared/effect-modules.ts`, which the four rules share.
