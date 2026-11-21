@@ -40,7 +40,7 @@ const preset = {
     'anti-slop/require-safety-comment-for-type-assertion': 'error',
     'anti-slop/require-suppression-reason': 'error',
     'anti-slop-effect/no-manual-effect-error-tag': 'error',
-    'anti-slop-effect/no-ordie-in-service-construction': 'error',
+    'anti-slop-effect/no-ordie': 'error',
     'anti-slop-effect/no-service-constructor-imports': 'error',
     'anti-slop-effect/no-service-parameters': 'error',
     'anti-slop-effect/no-unbounded-retry': 'error',

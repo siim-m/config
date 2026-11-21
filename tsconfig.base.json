@@ -94,7 +94,7 @@
           "allOfMapToForEach": "error",
           "catchAllTagDispatchToCatchTag": "error",
           "catchConditionalRefailToCatchIf": "error",
-          "catchDieToOrDie": "error",
+          "catchDieToOrDie": "off",
           "catchIfTagToCatchTag": "error",
           "catchRefailToTapError": "error",
           "effectSleepZeroToYieldNow": "error",

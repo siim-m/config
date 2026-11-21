@@ -25,6 +25,9 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
   Inc.).
 - `effect/rules/no-service-parameters.ts` and `effect/baseline.ts`, with `exempt` and `baseline`
   options.
+- `effect/rules/no-ordie.ts`, which replaced the fork's `no-ordie-in-service-construction`: it
+  reports `orDie` everywhere outside tests, not only while a service is built, and a catch-all
+  handler that only dies.
 
 ## From Kyle Mistele's fork
 
@@ -35,7 +38,6 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
   or none, such as `ts/no-unsafe-type-assertion`, counts, since oxlint matches built-in rules by
   name; the rule list ends at ` --` even with no space before the reason; and spaces or newlines
   separate rule names as commas do.
-- `effect/rules/no-ordie-in-service-construction.ts`
 - `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT, which ships no
   copyright notice). Changed:
   - reads Effect 4's array form `Schedule.max([a, b])` and `Schedule.min([a, b])`;
@@ -52,7 +54,9 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
   `new A.B(...)`.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
   `effect/LICENSE-enfect`).
-- `effect/shared/effect-modules.ts`, which the four rules share.
+- `effect/shared/effect-modules.ts`, which these rules and `no-ordie` share. `serviceClass` and a few
+  other helpers have no caller since `no-ordie-in-service-construction` went; they stay so the file
+  still diffs cleanly against the fork.
 
 To update them, diff those files in the fork from `13b0203`.
 
