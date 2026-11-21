@@ -31,14 +31,17 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistele/anti-slop) at
 `13b0203` (2026-11-19), MIT. Unchanged except where "Changed" says:
 
-- `rules/no-disabled-type-assertion-rules.ts`. Changed: a rule named without its plugin, such as
-  `no-unsafe-type-assertion`, counts, since oxlint applies it to every plugin.
+- `rules/no-disabled-type-assertion-rules.ts`. Changed: a built-in rule named under any prefix
+  or none, such as `ts/no-unsafe-type-assertion`, counts, since oxlint matches built-in rules by
+  name; and the rule list ends at ` --` even with no space before the reason.
 - `effect/rules/no-ordie-in-service-construction.ts`
 - `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT, which ships no
   copyright notice). Changed: reads Effect 4's array form `Schedule.max([a, b])` and
-  `Schedule.min([a, b])`, and reads a schedule defined in terms of itself as unknown instead of
-  overflowing the stack.
-- `effect/rules/require-cause-when-narrowing.ts`
+  `Schedule.min([a, b])`; reads a schedule defined in terms of itself, or passed through a
+  combinator it doesn't know such as `Schedule.while`, as unknown; and treats `times: undefined` as
+  no limit.
+- `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
+  `.pipe(Effect.tapError(...))` counts as logged.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
   `effect/LICENSE-enfect`).
 - `effect/shared/effect-modules.ts`, which the four rules share.

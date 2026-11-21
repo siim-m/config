@@ -26,7 +26,7 @@ const DIVIDER = /^(?:[-=*#~_/+\u2500-\u257F]{3,}(?:\s.*)?|.*[-=*#~_\u2500-\u257F
 const STEP_LABEL = /^(?:arrange|act|assert|given|when|then)\s*[:.]?$/iu;
 const TASK_MARKER = /(?<!-)\b(?:TODO|FIXME|XXX|HACK)\b(?!-)/u;
 /** A markdown heading, which a doc comment may use: `### Example`. */
-const HEADING = /^#{1,6}\s+\w/u;
+const HEADING = /^#{1,6}\s+\S/u;
 const TASK_LINK = /#\d+|\b[A-Z][A-Z\d]*-\d+\b|https?:\/\//u;
 const JSDOC_TYPE = /^@(?:param|returns?|type|typedef)\s+\{/u;
 const EMPTY_JSDOC_TAG = /^@(?:param(?:\s+\[?[\w$.]+\]?)?|returns?)$/u;

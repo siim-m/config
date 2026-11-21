@@ -1,3 +1,4 @@
+// Changed from the fork: a data-first source built with `.pipe(Effect.tapError(...))` counts as logged.
 import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
@@ -95,6 +96,18 @@ function constructedErrors(handler: FunctionNode, names: EffectModuleNames): rea
 	return [...new Set(found)];
 }
 
+/** The steps that build a data-first source: the steps of `source.pipe(...)` or `pipe(source, ...)`, or the source itself. */
+function sourceSteps(source: ESTree.Node): readonly ESTree.Node[] {
+	const expression = unwrapNode(source);
+	if (expression.type !== "CallExpression") return [expression];
+	const callee = unwrapNode(expression.callee);
+	if (callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && callee.property.name === "pipe") {
+		return [expression, ...expression.arguments];
+	}
+	if (callee.type === "Identifier" && callee.name === "pipe") return [expression, ...expression.arguments.slice(1)];
+	return [expression];
+}
+
 /** Whether `node` is a call of a tap operator, or the operator itself. */
 function isTapStep(node: ESTree.Node, names: EffectModuleNames): boolean {
 	const expression = unwrapNode(node);
@@ -128,7 +141,7 @@ export const requireCauseWhenNarrowingRule = defineRule({
 				const constructed = constructedErrors(handler, names).find((construction) => !passesCause(construction));
 				if (constructed === undefined) return;
 				const dataFirstSource = node.arguments.length > 1 ? node.arguments[0] : undefined;
-				const earlier = dataFirstSource === undefined ? precedingSteps(node) : [dataFirstSource];
+				const earlier = dataFirstSource === undefined ? precedingSteps(node) : sourceSteps(dataFirstSource);
 				if (earlier.some((step) => isTapStep(step, names))) return;
 				const callee = unwrapNode(constructed.callee);
 				const errorName =

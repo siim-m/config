@@ -19,6 +19,10 @@ tester.run("anti-slop-effect/require-cause-when-narrowing", requireCauseWhenNarr
 		const a = decode(text).pipe(Effect.tapError(Effect.logError), Effect.mapError(() => BadRequest.make({ reason: "Invalid JSON" })));
 		const b = Effect.fn("decode")(function* () {}, Effect.tapCause(Effect.logError), Effect.catch(() => Effect.fail(new Failed())));
 		const c = Effect.mapError(Effect.tapErrorCause(decode(text), Effect.logError), () => new Failed());`,
+		// A data-first source built with a tap counts too.
+		`${imports}
+		const a = Effect.mapError(decode(text).pipe(Effect.tapError(Effect.logError)), () => new Failed());
+		const b = Effect.mapError(pipe(decode(text), Effect.tapError(Effect.logError)), () => new Failed());`,
 		// Specific expected tags are handled on purpose.
 		`${imports}
 		const a = load.pipe(Effect.catchTag("NotFound", () => Effect.fail(new Missing())));

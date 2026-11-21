@@ -109,6 +109,7 @@ tester.run('anti-slop/comments', commentsRule, {
     },
     // A markdown heading in a doc comment is not a divider.
     '/**\n * Loads a row.\n *\n * ### Example\n * load(1)\n */\nfunction load(id: number) { return id; }',
+    '/**\n * Loads a row.\n *\n * ### `load(1)`\n */\nfunction load(id: number) { return id; }',
     // A placeholder such as XXX-XXX-XXXX is not a task marker.
     '// Phone numbers look like XXX-XXX-XXXX.\nconst a = 1;',
     // A destructured binding exported by name (S14).

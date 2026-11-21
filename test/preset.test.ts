@@ -79,6 +79,21 @@ test('the oxlint preset reports tests that cannot fail or lean on time', () => {
   );
 });
 
+test('the oxlint preset reports a cast rule disabled under another prefix', () => {
+  const { output } = run('oxlint', [
+    '--type-aware',
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint.config.mts',
+    'test/fixture/disables.ts',
+  ]);
+
+  // oxlint honours the disable, so the guard is what reports the cast.
+  const reported = reportedRules(output).get('test/fixture/disables.ts') ?? [];
+  assert.ok(reported.includes('anti-slop(no-disabled-type-assertion-rules)'), output);
+  assert.ok(!reported.includes('typescript(no-unsafe-type-assertion)'), output);
+});
+
 test('the oxlint preset lets tests throw inside Effect.gen', () => {
   const { output } = run('oxlint', [
     '--format=unix',

@@ -21,7 +21,8 @@ function normalizeRuleName(rule: string): string {
 function directiveRules(value: string): readonly string[] | null {
   const match = directivePattern.exec(value);
   if (match === null) return null;
-  const list = (match[1] ?? "").split(/\s--\s|\s--$/u)[0] ?? "";
+  // Oxlint ends the rule list at ` --`, with or without a space before the reason.
+  const list = (match[1] ?? "").split(/\s--/u)[0] ?? "";
   return list
     .split(",")
     .map(normalizeRuleName)

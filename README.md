@@ -24,12 +24,12 @@ export default { ...base, singleQuote: false };
 { "extends": "@siim-m/config/tsconfig.json" }
 ```
 
-It needs Node 22.18 or later. Every rule is on at `error`; a project turns off what it can't pass
-yet. Run oxlint with `--type-aware`, which uses [tsrs](https://github.com/oxc-project/tsrs), the
-Rust port of TypeScript 7 (in beta), when it's installed, or `oxlint-tsgolint` in its place. Either
-one only backs the lint rules, so keep the project's own `tsc` or `@effect/tsgo` typecheck. For
-ts-reset's stricter built-in types, add `import '@siim-m/config/reset.d.ts';` to a `.d.ts` file in
-the project.
+It needs Node 22.18 or later in 22, or 24.11 or later. Every rule is on at `error`; a project turns
+off what it can't pass yet. Run oxlint with `--type-aware`, which uses
+[tsrs](https://github.com/oxc-project/tsrs), the Rust port of TypeScript 7 (in beta), when it's
+installed, or `oxlint-tsgolint` in its place. Either one only backs the lint rules, so keep the
+project's own `tsc` or `@effect/tsgo` typecheck. For ts-reset's stricter built-in types, add
+`import '@siim-m/config/reset.d.ts';` to a `.d.ts` file in the project.
 
 A disable comment or `@ts-expect-error` must say why, after `--` or on the line above
 (`anti-slop/require-suppression-reason`). The type-assertion rules can't be disabled inline at all;
@@ -67,7 +67,7 @@ other shortcuts agents take:
   know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and typescript-eslint,
   which install TypeScript 6 as a peer, nested under this package when the project has TypeScript 7.
 - From [landmines](https://github.com/interfere-inc/landmines): `no-fixed-sleep`,
-  `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. All but `no-unsignaled-poll` take an
+  `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. All four take an
   `allow: { "<file>": <count> }` option for adopting them file by file.
 
 Both plugins load whole, so their other rules are there to turn on, such as landmines'

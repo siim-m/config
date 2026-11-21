@@ -1,6 +1,7 @@
 // Ported from cevr/effect-oxlint's `no-unbounded-retry` (https://github.com/cevr/effect-oxlint, MIT,
 // oxlint-plugin-effect 0.32.4). This version also accepts the bounds Effect 4.1 offers: `Schedule.upTo`,
 // `Schedule.max` with a bounded schedule, bounded schedule constructors, and a later `Effect.timeout`.
+// A combinator it doesn't know, such as `Schedule.while`, may stop the schedule, so it reads as unknown.
 import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
@@ -30,6 +31,22 @@ const intersections: ReadonlySet<string> = new Set(["max"]);
 
 /** Combinators that keep recurring while any schedule recurs, so every schedule must be bounded. */
 const unions: ReadonlySet<string> = new Set(["concat", "min"]);
+
+/** Combinators that change a schedule's delays or outputs but not when it stops. Others may stop it, so they read as unknown. */
+const keepers: ReadonlySet<string> = new Set([
+	"addDelay",
+	"as",
+	"asVoid",
+	"delayed",
+	"jittered",
+	"map",
+	"modifyDelay",
+	"passthrough",
+	"setInputType",
+	"tap",
+	"tapInput",
+	"tapOutput",
+]);
 
 /** Combinators that bound the schedule they are applied to. `take` is the Effect 3 name. */
 const limits: ReadonlySet<string> = new Set(["take", "upTo"]);
@@ -70,10 +87,14 @@ function expressionArguments(call: ESTree.CallExpression): readonly ESTree.Expre
 	return expressions;
 }
 
-/** The value of a non-computed property of an object literal, or null. */
+/** The value of a non-computed property of an object literal, or null when it is missing or `undefined`. */
 function propertyValue(object: ESTree.ObjectExpression, name: string): ESTree.Expression | null {
 	for (const property of object.properties) {
-		if (property.type === "Property" && !property.computed && keyName(property.key) === name) return property.value;
+		if (property.type !== "Property" || property.computed || keyName(property.key) !== name) continue;
+		const value = unwrapExpression(property.value);
+		if (value.type === "Identifier" && value.name === "undefined") return null;
+		if (value.type === "UnaryExpression" && value.operator === "void") return null;
+		return property.value;
 	}
 	return null;
 }
@@ -109,7 +130,7 @@ function applyCombinator(reader: ScheduleReader, current: Bound, member: string,
 	const others = args.map((argument) => scheduleBound(reader, argument));
 	if (intersections.has(member)) return both([current, ...others]);
 	if (unions.has(member)) return every([current, ...others]);
-	return current;
+	return keepers.has(member) ? current : "unknown";
 }
 
 /** Apply one `.pipe` step to the bound of the schedule before it. A step that is not a Schedule combinator is unknown. */
