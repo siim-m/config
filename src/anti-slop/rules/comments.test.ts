@@ -2,11 +2,6 @@ import { RuleTester } from 'oxlint/plugins-dev';
 import { commentsRule } from './comments.ts';
 
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: 'ts' } } });
-const forbidden = [
-  {
-    forbidden: [{ pattern: '\\b\\d{4}-\\d{2}-\\d{2}\\b', message: 'Leave dates to git.' }],
-  },
-];
 const multilineDocs = [{ multilineExportDocs: true }];
 
 tester.run('anti-slop/comments', commentsRule, {
@@ -44,11 +39,6 @@ tester.run('anti-slop/comments', commentsRule, {
     '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
     '// The CLI prints its result.\nconsole.log(1); // oxlint-disable-line no-console',
     '// Scripts print.\n/* oxlint-disable\n   no-console */\nconsole.log(1);',
-    // Forbidden patterns skip URLs.
-    {
-      code: '// WARNING: https://example.com/2026-11-20/notes explains it.\nconst a = 1;',
-      options: forbidden,
-    },
   ],
   invalid: [
     // Any other comment goes.
@@ -110,7 +100,7 @@ tester.run('anti-slop/comments', commentsRule, {
     },
     {
       code: '/**\n * Loads one row.\n *\n * @param id the row to load\n */\nexport function load(id: string) { return id; }',
-      errors: [{ messageId: 'multiLine' }],
+      errors: [{ messageId: 'multiLineDoc' }],
     },
     // And a word limit, since a formatter doesn't wrap comments.
     {
@@ -133,15 +123,15 @@ tester.run('anti-slop/comments', commentsRule, {
       code: "export enum State {\n  /** In progress. */\n  'in-progress' = 1,\n}",
       errors: [{ messageId: 'restatesName' }],
     },
+    // The doc is held to the binding that is exported, not the first one declared.
+    {
+      code: '/** The total seconds. */\nconst a = 1,\n  totalSeconds = 2;\nexport { totalSeconds };',
+      errors: [{ messageId: 'restatesName' }],
+    },
     {
       code: '/**\n * Load the user.\n */\nexport function loadUser() {}',
       options: multilineDocs,
       errors: [{ messageId: 'restatesName' }],
-    },
-    {
-      code: '// WARNING: changed on 2026-11-20.\nconst a = 1;',
-      options: forbidden,
-      errors: [{ messageId: 'forbidden' }],
     },
   ],
 });

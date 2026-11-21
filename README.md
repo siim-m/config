@@ -45,7 +45,7 @@ doc comments on exports, the reason above a suppression and comments that start 
 prefix. Each gets one line of at most 30 words (`maxWords`), and a doc comment that only repeats the
 name below it is reported. The prefixes default to `SAFETY`, `SYNC` and `WARNING`. An `allow` list
 replaces them, so keep `SAFETY` and `SYNC` in it: the type-assertion and React effect rules ask for
-those. `forbidden` adds patterns of your own.
+those.
 
 A file whose exports need longer docs, such as a library's public API, turns on
 `multilineExportDocs` in an override. The override replaces the rule's options, so repeat any others

@@ -1,16 +1,10 @@
 import { defineRule } from '@oxlint/plugins';
 import type { Comment, ESTree, SourceCode } from '@oxlint/plugins';
 
-interface Forbidden {
-  readonly pattern: string;
-  readonly message: string;
-}
-
 interface Options {
   readonly maxWords: number;
   readonly multilineExportDocs: boolean;
   readonly allow: readonly string[];
-  readonly forbidden: readonly Forbidden[];
 }
 
 const DIRECTIVE =
@@ -18,7 +12,6 @@ const DIRECTIVE =
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
 const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
-const URL = /\bhttps?:\/\/\S+/gu;
 const FILLER = new Set(
   'a an the of for to in on at by with from and or is are be this that it its as'.split(' ')
 );
@@ -140,6 +133,19 @@ function exportedStatements(
 const docTarget = (node: ESTree.Node): ESTree.Node =>
   node.type === 'VariableDeclarator' && node.parent !== null ? node.parent : node;
 
+/** The name a declaration or member declares, for the doc comment above it. */
+function nameOf(node: ESTree.Node): string | undefined {
+  let target: ESTree.Node | null = node;
+  if (target.type === 'ExportNamedDeclaration' || target.type === 'ExportDefaultDeclaration')
+    target = target.declaration;
+  if (target?.type === 'VariableDeclaration') target = target.declarations[0] ?? null;
+  if (target === null) return undefined;
+  const id = 'key' in target ? target.key : 'id' in target ? target.id : undefined;
+  if (id?.type === 'Identifier') return id.name;
+  if (id?.type === 'Literal' && typeof id.value === 'string') return id.value;
+  return undefined;
+}
+
 /**
  * Whether a suppression directive follows a comment group on the next lines, past other
  * directives, so the group is its reason, as `require-suppression-reason` reads it.
@@ -207,15 +213,6 @@ export const commentsRule = defineRule({
           maxWords: { type: 'integer', minimum: 1 },
           multilineExportDocs: { type: 'boolean' },
           allow: { type: 'array', items: { type: 'string', minLength: 1 } },
-          forbidden: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: { pattern: { type: 'string' }, message: { type: 'string' } },
-              required: ['pattern', 'message'],
-              additionalProperties: false,
-            },
-          },
         },
         additionalProperties: false,
       },
@@ -225,64 +222,35 @@ export const commentsRule = defineRule({
         maxWords: 30,
         multilineExportDocs: false,
         allow: ['SAFETY', 'SYNC', 'WARNING'],
-        forbidden: [],
       },
     ],
     messages: {
       untagged:
         'Remove this comment: put the meaning in names and the rationale in the PR. Comments that start with {{prefixes}}, directives, docs on exports and the reason above a suppression stay.',
-      multiLine:
-        "Keep this comment to one line. Leave the history to git and the PR. A file whose exports need longer docs sets `multilineExportDocs` in an override.",
+      multiLine: 'Keep this comment to one line. Leave the history to git and the PR.',
+      multiLineDoc:
+        'Keep this doc to one line. A file whose exports need longer docs sets `multilineExportDocs` in an override.',
       tooLong: 'This comment has {{words}} words; the limit is {{max}}.',
       restatesName: 'This doc only repeats the name below it. Say why, or say nothing.',
-      forbidden: 'This comment has `{{match}}` in it. {{message}}',
     },
   },
   create(context) {
     // SAFETY: oxlint validates the options against the schema above and fills in defaultOptions.
     const [options] = context.options as unknown as readonly [Options];
     const { sourceCode } = context;
-    const forbidden = options.forbidden.map(({ pattern, message }) => ({
-      pattern: new RegExp(pattern, 'u'),
-      message,
-    }));
     const isTagged = (line: string) =>
       options.allow.some(
         (prefix) => line.startsWith(`${prefix}:`) && line.slice(prefix.length + 1).trim() !== ''
       );
     const prefixes = options.allow.map((prefix) => `\`${prefix}:\``).join(', ');
     const members: ESTree.Node[] = [];
-    /** Declarations and members by where they start, for the name a comment sits above. */
-    const named = new Map<number, string>();
-    const name = (node: ESTree.Node, id: ESTree.Node | null | undefined) => {
-      if (id?.type === 'Identifier') named.set(node.start, id.name);
-      else if (id?.type === 'Literal' && typeof id.value === 'string')
-        named.set(node.start, id.value);
-    };
     const collect = (node: ESTree.Node) => {
       members.push(node);
-      if ('key' in node) name(node, node.key);
-      else if ('id' in node) name(node, node.id);
-    };
-    const declaration = (node: ESTree.Node) => {
-      if (node.type === 'VariableDeclaration') name(node, node.declarations[0]?.id);
-      else if ('id' in node) name(node, node.id);
-    };
-    const exported = (node: ESTree.ExportNamedDeclaration | ESTree.ExportDefaultDeclaration) => {
-      const inner = node.declaration;
-      if (inner === null) return;
-      if (inner.type === 'VariableDeclaration') name(node, inner.declarations[0]?.id);
-      else if ('id' in inner) name(node, inner.id);
     };
 
-    const restatesName = (last: Comment, lines: readonly string[]): boolean => {
+    /** Whether a doc says nothing but the words of the name it documents. */
+    const restatesName = (lines: readonly string[], name: string): boolean => {
       if (lines.some((line) => line.startsWith('@'))) return false;
-      // A trailing comment belongs to the code before it on its line.
-      const before = (sourceCode.lines[last.loc.start.line - 1] ?? '').slice(0, last.loc.start.column);
-      if (before.trim() !== '') return false;
-      const next = sourceCode.getTokenAfter(last);
-      const name = next === null ? undefined : named.get(next.start);
-      if (name === undefined) return false;
       const words = contentWords(lines.join(' '));
       const fromName = nameWords(name);
       return words.length > 0 && words.length <= 6 && words.every((word) => fromName.has(word));
@@ -290,26 +258,17 @@ export const commentsRule = defineRule({
 
     /** The first problem with a comment, as a message id and its data. */
     const problem = (
-      group: readonly Comment[],
       lines: readonly string[],
-      exportDoc: boolean,
-      explainsSuppression: boolean
+      kind: 'exportDoc' | 'reason' | 'other',
+      name: string | undefined
     ): readonly [string, Record<string, string | number>?] | undefined => {
-      if (!exportDoc && !explainsSuppression && !isTagged(lines[0] ?? '')) {
-        return ['untagged', { prefixes }];
-      }
-      const body = lines.join('\n');
-      const exempt = exportDoc && options.multilineExportDocs;
-      if (!exempt && lines.length > 1) return ['multiLine'];
-      const words = body.split(/\s+/u).filter((word) => word !== '').length;
+      if (kind === 'other' && !isTagged(lines[0] ?? '')) return ['untagged', { prefixes }];
+      const exempt = kind === 'exportDoc' && options.multilineExportDocs;
+      if (!exempt && lines.length > 1)
+        return [kind === 'exportDoc' ? 'multiLineDoc' : 'multiLine'];
+      const words = lines.join(' ').split(/\s+/u).filter((word) => word !== '').length;
       if (!exempt && words > options.maxWords) return ['tooLong', { words, max: options.maxWords }];
-      const last = group.at(-1);
-      if (exportDoc && last !== undefined && restatesName(last, lines)) return ['restatesName'];
-      const prose = body.replace(URL, '');
-      for (const { pattern, message } of forbidden) {
-        const match = pattern.exec(prose)?.[0];
-        if (match !== undefined) return ['forbidden', { match, message }];
-      }
+      if (name !== undefined && restatesName(lines, name)) return ['restatesName'];
       return undefined;
     };
 
@@ -323,24 +282,17 @@ export const commentsRule = defineRule({
       PropertyDefinition: collect,
       MethodDefinition: collect,
       Property: collect,
-      VariableDeclaration: declaration,
-      FunctionDeclaration: declaration,
-      ClassDeclaration: declaration,
-      TSDeclareFunction: declaration,
-      TSInterfaceDeclaration: declaration,
-      TSTypeAliasDeclaration: declaration,
-      TSEnumDeclaration: declaration,
-      ExportNamedDeclaration: exported,
-      ExportDefaultDeclaration: exported,
       'Program:exit'(program) {
         const exportedNodes = exportedStatements(program, sourceCode);
-        const exportDocs = new Set<number>();
-        const addDoc = (node: ESTree.Node) => {
-          const doc = docBefore(node, sourceCode);
-          if (doc !== undefined) exportDocs.add(doc.start);
+        /** Export docs by where they start, with the name each documents. */
+        const exportDocs = new Map<number, string | undefined>();
+        const addDoc = (target: ESTree.Node, name: string | undefined) => {
+          const doc = docBefore(target, sourceCode);
+          if (doc !== undefined) exportDocs.set(doc.start, name);
         };
-        for (const node of exportedNodes) addDoc(docTarget(node));
-        for (const member of members) if (isExposedMember(member, exportedNodes)) addDoc(member);
+        for (const node of exportedNodes) addDoc(docTarget(node), nameOf(node));
+        for (const member of members)
+          if (isExposedMember(member, exportedNodes)) addDoc(member, nameOf(member));
         const codeStart = program.body[0]?.start ?? sourceCode.text.length;
 
         const groups = commentGroups(sourceCode.getAllComments(), sourceCode.text);
@@ -358,13 +310,13 @@ export const commentsRule = defineRule({
             (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
           const lines = group.flatMap(textLines);
           if (licence || lines.length === 0) continue;
-          const explainsSuppression = ownLine(first) && suppressionFollows(groups, index, ownLine);
-          const found = problem(
-            group,
-            lines,
-            group.length === 1 && exportDocs.has(first.start),
-            explainsSuppression
-          );
+          const exportDoc = group.length === 1 && exportDocs.has(first.start);
+          const kind = exportDoc
+            ? 'exportDoc'
+            : ownLine(first) && suppressionFollows(groups, index, ownLine)
+              ? 'reason'
+              : 'other';
+          const found = problem(lines, kind, exportDocs.get(first.start));
           if (found === undefined) continue;
           const [messageId, data] = found;
           context.report({ loc: { start: first.loc.start, end: last.loc.end }, messageId, data });

@@ -31,5 +31,4 @@ export function fail(): never {
 // oxlint-disable-next-line anti-slop/no-chained-type-assertions
 export const count = 1;
 
-// WARNING: this fixture's oxlint.config.mts turns no-reflect-get off.
 export const value = Reflect.get({ a: 1 }, 'a');
