@@ -78,10 +78,11 @@ config that still names the old rule, so rename or remove it there.
 
 `anti-slop-effect/no-service-parameters` reports a function parameter typed as a service, such as
 `(mailer: MailerShape, to: string) => mailer.send(to)`. Get the service from context where the
-caller is built instead. A type that a service class names as its shape counts only when it has
-operations (methods, or members typed as functions, Effects or Streams), so a function can take a
-plain data type, such as the signed-in user, even when a service provides it. List services that
-callers may pass along anyway, such as request context, in `exempt`.
+caller is built instead. A function may still take a service's shape when the file shows it's plain
+data, such as a signed-in user built from `Schema.Struct` or `Schema.Class`, with no methods or
+members typed as functions, Effects, Streams or Refs. A shape the rule can't see into, such as
+`Effect.Success<typeof make>`, stays a service, and an imported shape counts when it's named
+`…Shape`. List services that callers may pass along anyway, such as request context, in `exempt`.
 
 ## Tests and shortcuts
 

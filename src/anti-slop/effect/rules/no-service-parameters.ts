@@ -32,12 +32,27 @@ type FunctionNode = ESTree.Function | ESTree.ArrowFunctionExpression;
 
 /** Wrappers whose result is still part of the type they take, such as `Pick<MailerShape, 'send'>`. */
 const PART_OF: ReadonlySet<string> = new Set(['Pick', 'Omit', 'Partial', 'Required', 'Readonly']);
-/** Member types that make a shape a set of operations rather than data. */
+/** Member types that make a shape a set of operations rather than data: effects and state handles. */
 const OPERATION_TYPES: ReadonlySet<string> = new Set([
   'Effect',
   'Effect.Effect',
   'Stream',
   'Stream.Stream',
+  'Ref.Ref',
+  'SynchronizedRef.SynchronizedRef',
+  'SubscriptionRef.SubscriptionRef',
+  'Queue.Queue',
+  'Queue.Dequeue',
+  'Queue.Enqueue',
+  'PubSub.PubSub',
+  'Deferred.Deferred',
+]);
+/** A schema's decoded or encoded type, such as `Schema.Schema.Type<typeof User>`, is data. */
+const SCHEMA_DATA_TYPES: ReadonlySet<string> = new Set([
+  'Schema.Schema.Type',
+  'Schema.Schema.Encoded',
+  'Schema.Type',
+  'Schema.Encoded',
 ]);
 /** `Schema.Class`, `Data.TaggedClass` and the like: classes that hold data. */
 const DATA_CLASS_MODULES: ReadonlySet<string> = new Set(['Schema', 'Data']);
@@ -77,10 +92,15 @@ function serviceShape(node: ESTree.Class): ESTree.TSType | undefined {
   return undefined;
 }
 
+/** A `Schema.Class` or `Data.Class` with no methods of its own. */
 function isDataClass(node: ESTree.Class): boolean {
   let callee = node.superClass;
   while (callee?.type === 'CallExpression') callee = callee.callee;
+  const hasMethods = node.body.body.some(
+    (member) => member.type === 'MethodDefinition' && member.kind === 'method' && !member.static
+  );
   return (
+    !hasMethods &&
     callee?.type === 'MemberExpression' &&
     callee.object.type === 'Identifier' &&
     DATA_CLASS_MODULES.has(callee.object.name) &&
@@ -92,30 +112,33 @@ const combine = (kinds: readonly ShapeKind[]): ShapeKind =>
   kinds.includes('operations') ? 'operations' : kinds.includes('unknown') ? 'unknown' : 'data';
 
 /**
- * Reads what a shape holds. An operation is a method, or a member typed as a function, an Effect
- * or a Stream, through local aliases and nested objects. A shape is data only when the file shows
- * all of it; one built from a type the rule can't see into, such as
- * `Effect.Success<typeof make>`, stays a service. An import is data unless it's named `…Shape`.
+ * Reads what a shape holds. An operation is a method, or a member typed as a function, an Effect,
+ * a Stream or a state handle such as a Ref, through local aliases and nested objects. A shape is
+ * data only when the file shows all of it; one built from a type the rule can't see into, such as
+ * `Effect.Success<typeof make>`, stays a service. `importedData` decides what an import not named
+ * `…Shape` is: data for a parameter typed by that name, unknown for the service's own instance.
  */
 function shapeKind(
   types: ReadonlyMap<string, LocalType>,
   dataClasses: ReadonlySet<string>,
-  imported: ReadonlySet<string>
+  imported: ReadonlySet<string>,
+  importedData: boolean
 ): (type: ESTree.TSType) => ShapeKind {
   const named = (name: string, seen: ReadonlySet<string>): ShapeKind => {
     const local = types.get(name);
     if (local !== undefined)
       return seen.has(name) ? 'unknown' : kind(local, new Set([...seen, name]));
     if (dataClasses.has(name)) return 'data';
-    if (imported.has(name)) return name.endsWith('Shape') ? 'unknown' : 'data';
+    if (imported.has(name)) return importedData && !name.endsWith('Shape') ? 'data' : 'unknown';
     return 'unknown';
   };
   // A member the rule can't see into, such as `readonly id: UserId`, is data.
   const member = (signature: ESTree.TSSignature, seen: ReadonlySet<string>): ShapeKind => {
     if (signature.type === 'TSMethodSignature' || signature.type === 'TSCallSignatureDeclaration')
       return 'operations';
-    if (signature.type !== 'TSPropertySignature' || signature.typeAnnotation === null)
-      return 'data';
+    const isValue =
+      signature.type === 'TSPropertySignature' || signature.type === 'TSIndexSignature';
+    if (!isValue || signature.typeAnnotation === null) return 'data';
     return kind(signature.typeAnnotation.typeAnnotation, seen) === 'operations'
       ? 'operations'
       : 'data';
@@ -139,9 +162,13 @@ function shapeKind(
       case 'TSUnionType':
       case 'TSIntersectionType':
         return combine(type.types.map((part) => kind(part, seen)));
+      case 'TSTypeQuery':
+        // `typeof User.Type`: the data a schema decodes to.
+        return /\.(?:Type|Encoded)$/u.test(typeQueryText(type) ?? '') ? 'data' : 'unknown';
       case 'TSTypeReference': {
         const name = typeNameText(type.typeName);
         if (OPERATION_TYPES.has(name)) return 'operations';
+        if (SCHEMA_DATA_TYPES.has(name)) return 'data';
         const [argument] = type.typeArguments?.params ?? [];
         if (PART_OF.has(name) && argument !== undefined) return kind(argument, seen);
         return type.typeName.type === 'Identifier' ? named(name, seen) : 'unknown';
@@ -177,15 +204,21 @@ function collectTypeDeclarations(program: ESTree.Program): TypeDeclarations {
   const dataClasses = new Set(
     classes.flatMap((node) => (node.id !== null && isDataClass(node) ? [node.id.name] : []))
   );
-  const kindOf = shapeKind(types, dataClasses, imported);
+  const parameterKind = shapeKind(types, dataClasses, imported, true);
+  const instanceKind = shapeKind(types, dataClasses, imported, false);
   const shapes = new Map<string, string>();
   const dataServices = new Set<string>();
   for (const node of classes) {
     const shape = serviceShape(node);
     if (shape === undefined || node.id === null) continue;
-    if (kindOf(shape) === 'data') dataServices.add(node.id.name);
-    else if (shape.type === 'TSTypeReference' && shape.typeName.type === 'Identifier') {
-      shapes.set(shape.typeName.name, node.id.name);
+    if (instanceKind(shape) === 'data') dataServices.add(node.id.name);
+    // A parameter typed by the shape's own name, such as `Person`, unless the shape is generic.
+    const named =
+      shape.type === 'TSTypeReference' &&
+      shape.typeName.type === 'Identifier' &&
+      shape.typeArguments === null;
+    if (named && parameterKind(shape) !== 'data') {
+      shapes.set(typeNameText(shape.typeName), node.id.name);
     }
   }
   return { types, shapes, dataServices, imported };

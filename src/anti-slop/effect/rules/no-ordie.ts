@@ -5,6 +5,7 @@ import {
   isFunction,
   moduleCallName,
   moduleMemberName,
+  resolveIdentifier,
   resolveInitializer,
   returnedExpressions,
   unwrapExpression,
@@ -43,8 +44,16 @@ function alwaysDies(
   sourceCode: SourceCode
 ): boolean {
   let node = unwrapNode(handler);
+  if (node.type === 'Identifier') {
+    // Only a binding that is never reassigned still holds what it was declared with.
+    const reassigned = resolveIdentifier(sourceCode, node)?.references.some(
+      (reference) => reference.isWrite() && !reference.init
+    );
+    const initializer = reassigned === false ? resolveInitializer(sourceCode, node) : null;
+    if (initializer === null) return false;
+    node = unwrapNode(initializer);
+  }
   if (memberOf(node, names, ORDIE_MODULES, DIE_MEMBERS) !== undefined) return true;
-  if (node.type === 'Identifier') node = resolveInitializer(sourceCode, node) ?? node;
   if (!isFunction(node)) return false;
   const returned = returnedExpressions(node);
   return (

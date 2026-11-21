@@ -54,6 +54,18 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
     const audit = (person: CurrentPerson['Service']) => person.id;`,
     `class CurrentUser extends Context.Service<CurrentUser, { readonly id: string }>()('CurrentUser') {}
     const audit = (user: CurrentUser['Service']) => user.id;`,
+    // A schema's `Type` is data, as in a union of two Schema.Struct types.
+    `const User = Schema.Struct({ id: Schema.String, email: Schema.String });
+    type User = typeof User.Type;
+    const Guest = Schema.Struct({ id: Schema.String, email: Schema.Null });
+    type Guest = Schema.Schema.Type<typeof Guest>;
+    type Person = User | Guest;
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const isGuest = (person: Person) => person.email === null;
+    const audit = (person: CurrentPerson['Service']) => person.id;`,
+    // A generic shape names no type of its own.
+    `class Settings extends Context.Service<Settings, Record<string, string>>()('Settings') {}
+    const tally = (counts: Record<string, number>) => counts;`,
     // Only an Effect service factory names a service's shape.
     `interface Props { onSave(): void }
     class Form extends component<Form, Props>() {}
@@ -144,6 +156,34 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       errors: [
         { ...error, data: { parameter: 'cache', service: 'Cache' } },
         { ...error, data: { parameter: 'mail', service: 'Mailer' } },
+      ],
+    },
+    {
+      // An imported shape is a service's instance; only the bare imported name may be data.
+      code: `import type { MailerApi } from './api';
+      class Mailer extends Context.Service<Mailer, MailerApi>()('app/Mailer') {}
+      const a = (mailer: Mailer['Service']) => mailer;
+      const b = (mailer: Context.Service.Shape<typeof Mailer>) => mailer;`,
+      errors: [
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+      ],
+    },
+    {
+      // Operations behind an index signature, a state handle, or a data class's method.
+      code: `interface HooksShape { readonly [name: string]: () => Effect.Effect<void> }
+      interface CounterShape { readonly count: Ref.Ref<number> }
+      class Account extends Schema.Class<Account>('Account')({ id: Schema.String }) {
+        send() { return Effect.log(this.id); }
+      }
+      class Hooks extends Context.Service<Hooks, HooksShape>()('app/Hooks') {}
+      class Counter extends Context.Service<Counter, CounterShape>()('app/Counter') {}
+      class CurrentAccount extends Context.Service<CurrentAccount, Account>()('app/CurrentAccount') {}
+      const run = (hooks: HooksShape, counter: CounterShape, account: Account) => account.send();`,
+      errors: [
+        { ...error, data: { parameter: 'hooks', service: 'Hooks' } },
+        { ...error, data: { parameter: 'counter', service: 'Counter' } },
+        { ...error, data: { parameter: 'account', service: 'CurrentAccount' } },
       ],
     },
     {

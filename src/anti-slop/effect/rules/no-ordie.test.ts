@@ -33,6 +33,11 @@ tester.run('anti-slop-effect/no-ordie', noOrDieRule, {
     const rows = list.pipe(Effect.catch(() => Effect.succeed([])));`,
     `${imports}
     const changes = feed.pipe(Stream.catchTag('Disconnected', Stream.die));`,
+    // A handler reassigned after it was declared may no longer die.
+    `${imports}
+    let recover = (error: Error) => Effect.die(error);
+    recover = () => Effect.void;
+    const rows = list.pipe(Effect.catch(recover));`,
     // Not Effect's modules.
     `import * as Effect from 'other-library';
     const value = risky.pipe(Effect.orDie, Effect.catch(Effect.die));`,
@@ -81,9 +86,11 @@ tester.run('anti-slop-effect/no-ordie', noOrDieRule, {
       code: `${imports}
       const handler = (error: Error) => Effect.die(error);
       function escalate(error: Error) { return Effect.die(error); }
+      const crash = Effect.die;
       const a = risky.pipe(Effect.catch(handler));
-      const b = risky.pipe(Effect.catch(escalate));`,
-      errors: [catchDie('Effect'), catchDie('Effect')],
+      const b = risky.pipe(Effect.catch(escalate));
+      const c = risky.pipe(Effect.catch(crash));`,
+      errors: [catchDie('Effect'), catchDie('Effect'), catchDie('Effect')],
     },
   ],
 });
