@@ -41,38 +41,84 @@ function ignoresError(handler: FunctionNode, sourceCode: SourceCode): boolean {
 }
 
 /** Effect modules whose `make` builds a value, such as a `Ref` or a `Queue`, rather than an error. */
+// From Effect 3 and 4: the modules that export a `make` and are not errors.
 const valueModules: ReadonlySet<string> = new Set([
+	"Array",
 	"BigDecimal",
 	"Cache",
 	"Chunk",
+	"Combiner",
+	"ConfigProvider",
+	"Cron",
 	"DateTime",
 	"Deferred",
-	"Duration",
+	"Equivalence",
+	"ExecutionPlan",
 	"FiberHandle",
 	"FiberMap",
+	"FiberRef",
 	"FiberSet",
+	"Filter",
+	"Graph",
 	"HashMap",
+	"HashRing",
 	"HashSet",
+	"KeyedPool",
 	"Latch",
+	"LayerMap",
+	"LayerRef",
 	"List",
+	"Logger",
 	"Mailbox",
 	"MutableHashMap",
 	"MutableHashSet",
 	"MutableList",
 	"MutableRef",
+	"Order",
+	"PartitionedSemaphore",
 	"Pool",
 	"PubSub",
 	"Queue",
 	"RcMap",
 	"RcRef",
 	"Redacted",
+	"Reducer",
 	"Ref",
+	"RequestResolver",
 	"Scope",
+	"ScopedCache",
+	"ScopedRef",
 	"Semaphore",
+	"Sink",
 	"SortedMap",
 	"SortedSet",
+	"Stream",
 	"SubscriptionRef",
 	"SynchronizedRef",
+	"TArray",
+	"TDeferred",
+	"TMap",
+	"TPriorityQueue",
+	"TPubSub",
+	"TQueue",
+	"TReentrantLock",
+	"TRef",
+	"TSemaphore",
+	"TSet",
+	"TSubscriptionRef",
+	"Tracer",
+	"Trie",
+	"Tuple",
+	"TxChunk",
+	"TxDeferred",
+	"TxHashMap",
+	"TxHashSet",
+	"TxPriorityQueue",
+	"TxQueue",
+	"TxReentrantLock",
+	"TxRef",
+	"TxSemaphore",
+	"TxSubscriptionRef",
 ]);
 
 /** The local names a file binds to Effect's value modules: `import { Ref } from "effect"` or `import * as Ref from "effect/Ref"`. */
@@ -212,8 +258,11 @@ export const requireCauseWhenNarrowingRule = defineRule({
 				const earlier = dataFirstSource === undefined ? precedingSteps(node) : sourceSteps(dataFirstSource);
 				if (earlier.some((step) => isTapStep(step, names))) return;
 				const callee = unwrapNode(constructed.callee);
+				// `X.make(...)` names `X`; `new A.B(...)` names `A.B`.
 				const errorName =
-					callee.type === "MemberExpression" ? context.sourceCode.getText(callee.object) : context.sourceCode.getText(callee);
+					callee.type === "MemberExpression" && constructed.type === "CallExpression"
+						? context.sourceCode.getText(callee.object)
+						: context.sourceCode.getText(callee);
 				context.report({ node: constructed, messageId: "missingCause", data: { operator: `Effect.${operator}`, error: errorName } });
 			},
 		};

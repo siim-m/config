@@ -35,6 +35,11 @@ tester.run("anti-slop-effect/require-cause-when-narrowing", requireCauseWhenNarr
 		`${imports}
 		import * as Queue from "effect/Queue";
 		const a = fetchUser(id).pipe(Effect.catch(() => Queue.make()));`,
+		`${imports}
+		import { ScopedCache, ScopedRef, TxRef } from "effect";
+		const a = Effect.catch(load, () => ScopedRef.make(() => 0));
+		const b = Effect.catch(load, () => ScopedCache.make({ lookup, capacity: 1 }));
+		const c = Effect.catch(load, () => TxRef.make(0));`,
 		// A data-first source built with a tap counts too.
 		`${imports}
 		const a = Effect.mapError(decode(text).pipe(Effect.tapError(Effect.logError)), () => new Failed());
@@ -54,6 +59,13 @@ tester.run("anti-slop-effect/require-cause-when-narrowing", requireCauseWhenNarr
 		const a = load.pipe(Effect.mapError(() => new Failed()));`,
 	],
 	invalid: [
+		// The message names the class being constructed.
+		{
+			code: `${imports}
+			import * as HttpClientError from "effect/http/HttpClientError";
+			const a = Effect.mapError(load, () => new HttpClientError.HttpClientErrorSchema({ kind: "TransportError" }));`,
+			errors: [missingCause("Effect.mapError", "HttpClientError.HttpClientErrorSchema")],
+		},
 		// An error schema imported from Effect is still an error.
 		{
 			code: `${imports}

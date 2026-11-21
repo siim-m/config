@@ -48,7 +48,8 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
 - `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
   `.pipe(Effect.tapError(...))` counts as logged; neither a yielded value bound to a name, such as
   `const ref = yield* Ref.make(0)`, nor the `make` of an Effect value module, such as
-  `Ref.make(0)` or `Queue.make()`, is a constructed error.
+  `Ref.make(0)` or `Queue.make()`, is a constructed error; and the message names `A.B` for
+  `new A.B(...)`.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
   `effect/LICENSE-enfect`).
 - `effect/shared/effect-modules.ts`, which the four rules share.
