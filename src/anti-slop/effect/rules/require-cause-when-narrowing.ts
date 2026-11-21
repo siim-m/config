@@ -129,7 +129,7 @@ export const requireCauseWhenNarrowingRule = defineRule({
 		},
 		messages: {
 			missingCause:
-				"This {{operator}} handler discards the original error and constructs a new one without it. Name the handler's parameter and pass it as `cause` (`(error) => new {{error}}({ ..., cause: error })`), or log it first with `Effect.tapError(Effect.logError)` before narrowing.",
+				"This {{operator}} handler discards the original error and constructs a new one without it. Name the handler's parameter and pass it as `cause` (`(error) => new {{error}}({ ..., cause: error })`, or `new Error(message, { cause: error })` for a native Error), or log it first with `Effect.tapError(Effect.logError)` before narrowing.",
 		},
 	},
 	create(context) {

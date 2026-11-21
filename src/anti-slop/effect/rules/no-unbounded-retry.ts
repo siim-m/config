@@ -1,7 +1,8 @@
 // Ported from cevr/effect-oxlint's `no-unbounded-retry` (https://github.com/cevr/effect-oxlint, MIT,
 // oxlint-plugin-effect 0.32.4). This version also accepts the bounds Effect 4.1 offers: `Schedule.upTo`,
 // `Schedule.max` with a bounded schedule, bounded schedule constructors, and a later `Effect.timeout`.
-// A combinator it doesn't know, such as `Schedule.while`, may stop the schedule, so it reads as unknown.
+// A combinator it doesn't know, such as `Schedule.while`, may stop the schedule, so it reads as unknown. Options
+// with no `schedule` and no `times` retry on Effect's default, `Schedule.forever`.
 import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
@@ -219,13 +220,16 @@ function retryCall(call: ESTree.CallExpression, names: EffectModuleNames): Retry
 	return { policy, timeoutApplies: effectMember !== null };
 }
 
-/** The schedule a policy retries on, or null when the policy bounds attempts with `times` or cannot be read. */
-function policySchedule(sourceCode: SourceCode, policy: ESTree.Expression): ESTree.Expression | null {
+/**
+ * The schedule a policy retries on, or null when the policy bounds attempts with `times` or cannot be read.
+ * Options with neither retry on Effect's default, `Schedule.forever`.
+ */
+function policySchedule(sourceCode: SourceCode, policy: ESTree.Expression): ESTree.Expression | "forever" | null {
 	const value = resolveConst(sourceCode, policy);
 	if (value.type !== "ObjectExpression") return value;
 	if (value.properties.some((property) => property.type === "SpreadElement")) return null;
 	if (propertyValue(value, "times") !== null) return null;
-	return propertyValue(value, "schedule");
+	return propertyValue(value, "schedule") ?? "forever";
 }
 
 const isPipeCallee = (callee: ESTree.Node): boolean =>
@@ -299,7 +303,8 @@ export const noUnboundedRetryRule = defineRule({
 				const retry = retryCall(node, names);
 				if (retry === null) return;
 				const schedule = policySchedule(context.sourceCode, retry.policy);
-				if (schedule === null || scheduleBound(reader, schedule) !== "unbounded") return;
+				if (schedule === null) return;
+				if (schedule !== "forever" && scheduleBound(reader, schedule) !== "unbounded") return;
 				if (retry.timeoutApplies && hasLaterTimeout(node, names)) return;
 				context.report({ node, messageId: "unboundedRetry" });
 			},

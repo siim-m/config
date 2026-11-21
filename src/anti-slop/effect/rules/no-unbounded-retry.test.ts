@@ -173,6 +173,17 @@ tester.run("anti-slop-effect/no-unbounded-retry", noUnboundedRetryRule, {
 			const answer = ask(prompt).pipe(Effect.retry(Schedule.concatResult(Schedule.recurs(3), Schedule.spaced("1 second"))));`,
 			errors: unbounded,
 		},
+		// Options with no schedule and no times retry forever, Effect's default.
+		{
+			code: `${imports}
+			const answer = Effect.retry(load, {});`,
+			errors: unbounded,
+		},
+		{
+			code: `${imports}
+			const client = HttpClient.retryTransient(base, { retryOn: "errors-only" });`,
+			errors: unbounded,
+		},
 		// An absent limit is no limit.
 		{
 			code: `${imports}

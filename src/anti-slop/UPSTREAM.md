@@ -40,7 +40,7 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
   copyright notice). Changed: reads Effect 4's array form `Schedule.max([a, b])` and
   `Schedule.min([a, b])`; reads a schedule defined in terms of itself, or passed through a
   combinator it doesn't know such as `Schedule.while`, as unknown; treats `times: undefined` as no
-  limit; and reads `Schedule.concatResult` like `concat`.
+  limit; reports options with no `schedule` and no `times`, which retry on `Schedule.forever`; and reads `Schedule.concatResult` like `concat`.
 - `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
   `.pipe(Effect.tapError(...))` counts as logged, and a yielded value bound to a name, such as
   `const ref = yield* Ref.make(0)`, is not a constructed error.
