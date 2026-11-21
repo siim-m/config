@@ -119,6 +119,37 @@ function exportedStatements(
   return exported;
 }
 
+/**
+ * In a Svelte component, the type its `$props()` call declares, inline or as a local interface or
+ * type alias: the component's API, whose member docs editors show to callers.
+ */
+function svelteProps(program: ESTree.Program, filename: string): readonly ESTree.Node[] {
+  if (!filename.endsWith('.svelte')) return [];
+  const types = new Map<string, ESTree.Node>();
+  for (const statement of program.body) {
+    if (statement.type === 'TSInterfaceDeclaration' || statement.type === 'TSTypeAliasDeclaration')
+      types.set(statement.id.name, statement);
+  }
+  const props: ESTree.Node[] = [];
+  for (const statement of program.body) {
+    if (statement.type !== 'VariableDeclaration') continue;
+    for (const { id, init } of statement.declarations) {
+      const callsProps =
+        init?.type === 'CallExpression' &&
+        init.callee.type === 'Identifier' &&
+        init.callee.name === '$props';
+      const type = id.typeAnnotation?.typeAnnotation;
+      if (!callsProps || type === undefined) continue;
+      if (type.type === 'TSTypeLiteral') props.push(type);
+      if (type.type === 'TSTypeReference' && type.typeName.type === 'Identifier') {
+        const declaration = types.get(type.typeName.name);
+        if (declaration !== undefined) props.push(declaration);
+      }
+    }
+  }
+  return props;
+}
+
 /** The statement a doc comment for an exported node sits above. */
 const docTarget = (node: ESTree.Node): ESTree.Node =>
   node.type === 'VariableDeclarator' && node.parent !== null ? node.parent : node;
@@ -261,7 +292,8 @@ export const commentsRule = defineRule({
           if (doc !== undefined) exportDocs.add(doc.start);
         };
         for (const node of exportedNodes) addDoc(docTarget(node));
-        for (const member of members) if (isExposedMember(member, exportedNodes)) addDoc(member);
+        const exposed = new Set([...exportedNodes, ...svelteProps(program, context.filename)]);
+        for (const member of members) if (isExposedMember(member, exposed)) addDoc(member);
         const codeStart = program.body[0]?.start ?? sourceCode.text.length;
 
         const groups = commentGroups(sourceCode.getAllComments(), sourceCode.text);

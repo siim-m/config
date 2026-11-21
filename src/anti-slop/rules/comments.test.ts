@@ -70,6 +70,11 @@ tester.run('anti-slop/comments', commentsRule, {
       code: 'export function f() {\n  type T = /** Hidden. */ "a" | "b";\n}',
       errors: [{ messageId: 'untagged' }],
     },
+    // Outside a Svelte component, a `$props()` type is a local type; see comments-svelte-cli.test.ts.
+    {
+      code: "interface Props {\n  /** The card's heading. */\n  title: string;\n}\nlet { title }: Props = $props();",
+      errors: [{ messageId: 'untagged' }],
+    },
     // Inside an exported function's body is not the export's API.
     {
       code: 'export const run = () => configure({ /** Why. */ debug: true });',
