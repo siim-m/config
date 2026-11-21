@@ -15,7 +15,7 @@ interface Options {
 }
 
 const DIRECTIVE =
-  /^(?:(?:oxlint|eslint)-|@ts-|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
+  /^(?:(?:oxlint|eslint)-(?:disable|enable|env)\b|eslint\s+[\w@/-]+\s*:|@ts-(?:expect-error|ignore|nocheck|check)\b|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
 const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
@@ -24,7 +24,9 @@ const CODE_SPAN = /`[^`]*`/gu;
 const ISSUE = /(?<![\w&/])#\d+\b(?![a-f])/giu;
 const DIVIDER = /^(?:[-=*#~_/+\u2500-\u257F]{3,}.*|.*[-=*#~_\u2500-\u257F]{3,})$/u;
 const STEP_LABEL = /^(?:arrange|act|assert|given|when|then)\s*[:.]?$/iu;
-const TASK_MARKER = /\b(?:TODO|FIXME|XXX|HACK)\b/u;
+const TASK_MARKER = /(?<!-)\b(?:TODO|FIXME|XXX|HACK)\b(?!-)/u;
+/** A markdown heading, which a doc comment may use: `### Example`. */
+const HEADING = /^#{1,6}\s+\w/u;
 const TASK_LINK = /#\d+|https?:\/\//u;
 const JSDOC_TYPE = /^@(?:param|returns?|type|typedef)\s+\{/u;
 const EMPTY_JSDOC_TAG = /^@(?:param(?:\s+\[?[\w$.]+\]?)?|returns?)$/u;
@@ -327,7 +329,8 @@ export const commentsRule = defineRule({
       ) {
         return ['untagged', { prefixes }];
       }
-      if (lines.some((line) => DIVIDER.test(line))) return ['divider'];
+      if (lines.some((line) => DIVIDER.test(line) && (isLine || !HEADING.test(line))))
+        return ['divider'];
       if (isLine && lines.length === 1 && STEP_LABEL.test(body)) return ['stepLabel'];
       if (isLine && lines.every((line) => COMMENTED_CODE.test(line))) return ['commentedOutCode'];
       if (TASK_MARKER.test(body) && !TASK_LINK.test(body)) return ['untrackedTask'];

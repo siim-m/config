@@ -51,9 +51,10 @@ repeat the name below them. `forbidden` adds patterns of your own:
 }],
 ```
 
-`policy: 'tagged-only'` goes further: only directives, licence headers, doc comments on exports and
-comments that start with an `allow` prefix stay. The prefixes default to `SAFETY`, `SYNC` and
-`WARNING`, which the type-assertion and React effect rules ask for.
+`policy: 'tagged-only'` goes further: only directives, licence headers, doc comments on exports, the
+reason above a suppression and comments that start with an `allow` prefix stay. The prefixes default
+to `SAFETY`, `SYNC` and `WARNING`, which the type-assertion and React effect rules ask for; an
+`allow` list replaces them, so keep those three in it.
 
 ## Tests and shortcuts
 
@@ -63,9 +64,10 @@ other shortcuts agents take:
 - From [eslint-plugin-ai-guard](https://github.com/ai-guard-dev/eslint-plugin-ai-guard):
   `no-assertionless-test`, `no-tautological-assertion`, `no-placeholder-implementation`,
   `no-test-env-branch`, `no-silent-fallback` and `no-undeclared-import`. Its test detection doesn't
-  know Effect's `it.effect`, so those tests go unchecked.
+  know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and typescript-eslint,
+  which install TypeScript 6 as a peer, nested under this package when the project has TypeScript 7.
 - From [landmines](https://github.com/interfere-inc/landmines): `no-fixed-sleep`,
-  `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. The first three take an
+  `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. All but `no-unsignaled-poll` take an
   `allow: { "<file>": <count> }` option for adopting them file by file.
 
 Both plugins load whole, so their other rules are there to turn on, such as landmines'

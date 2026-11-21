@@ -98,6 +98,10 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// The CLI prints its result.\n/**/\n// oxlint-disable-next-line no-console\nconsole.log(1);',
       options: taggedOnly,
     },
+    // A markdown heading in a doc comment is not a divider.
+    '/**\n * Loads a row.\n *\n * ### Example\n * load(1)\n */\nfunction load(id: number) { return id; }',
+    // A placeholder such as XXX-XXX-XXXX is not a task marker.
+    '// Phone numbers look like XXX-XXX-XXXX.\nconst a = 1;',
     // A destructured binding exported by name (S14).
     { code: '/** The API. */\nconst { api } = source;\nexport { api };', options: taggedOnly },
     // A reason above a multi-line disable block (S12).
@@ -222,6 +226,12 @@ tester.run('anti-slop/comments', commentsRule, {
       code: 'start(); // Starts it.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
       options: taggedOnly,
       errors: [{ messageId: 'untagged' }],
+    },
+    // Prose that starts with a tool's name is not a directive, so it counts.
+    {
+      code: '// eslint-plugin-foo reports this\n// one two three.\nconst a = 1;',
+      options: [{ maxWords: 5 }],
+      errors: [{ messageId: 'tooLong' }],
     },
     // Enum members are names too (S13).
     {

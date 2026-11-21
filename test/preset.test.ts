@@ -79,6 +79,21 @@ test('the oxlint preset reports tests that cannot fail or lean on time', () => {
   );
 });
 
+test('the oxlint preset lets tests throw inside Effect.gen', () => {
+  const { output } = run('oxlint', [
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint.config.mts',
+    'test/fixture/effect/throw.ts',
+    'test/fixture/effect/throw.test.ts',
+  ]);
+
+  const rule = 'anti-slop-effect(throw-in-effect-gen)';
+  const reported = reportedRules(output);
+  assert.ok(reported.get('test/fixture/effect/throw.ts')?.includes(rule), output);
+  assert.ok(!reported.get('test/fixture/effect/throw.test.ts')?.includes(rule), output);
+});
+
 test('the React preset adds its plugins and rules on top of the base', () => {
   const { status, output } = run('oxlint', [
     '--type-aware',
