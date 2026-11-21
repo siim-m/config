@@ -1,11 +1,11 @@
 import { defineRule } from '@oxlint/plugins';
-import type { ESTree } from '@oxlint/plugins';
+import type { ESTree, SourceCode } from '@oxlint/plugins';
 import {
   collectEffectModuleNames,
   isFunction,
-  isTestFile,
   moduleCallName,
   moduleMemberName,
+  resolveInitializer,
   returnedExpressions,
   unwrapExpression,
   unwrapNode,
@@ -33,10 +33,18 @@ function memberOf(
   return undefined;
 }
 
-/** Whether a catch handler turns every error into a defect: `Effect.die`, or a function that only returns a death. */
-function alwaysDies(handler: ESTree.Node, names: EffectModuleNames): boolean {
-  const node = unwrapNode(handler);
+/**
+ * Whether a catch handler turns every error into a defect: `Effect.die`, or a function, inline or
+ * declared in this file, that only returns a death.
+ */
+function alwaysDies(
+  handler: ESTree.Node,
+  names: EffectModuleNames,
+  sourceCode: SourceCode
+): boolean {
+  let node = unwrapNode(handler);
   if (memberOf(node, names, ORDIE_MODULES, DIE_MEMBERS) !== undefined) return true;
+  if (node.type === 'Identifier') node = resolveInitializer(sourceCode, node) ?? node;
   if (!isFunction(node)) return false;
   const returned = returnedExpressions(node);
   return (
@@ -53,7 +61,8 @@ function alwaysDies(handler: ESTree.Node, names: EffectModuleNames): boolean {
 
 /**
  * Keep errors typed: `orDie` turns every error in the channel into a defect, including errors added
- * to it later, so die only on errors named with `catchTag` or `catchTags`.
+ * to it later, so die only on errors named with `catchTag` or `catchTags`. The preset turns it off
+ * in test files, where a broken fixture may stop the run.
  */
 export const noOrDieRule = defineRule({
   meta: {
@@ -64,15 +73,14 @@ export const noOrDieRule = defineRule({
     },
     messages: {
       orDie:
-        "`{{module}}.{{member}}` turns every error in the channel into a defect, including ones added later, and the types won't show it. Die only on the errors you mean with `{{module}}.catchTag('Tag', Effect.die)` or `catchTags`, so a new error stays in the error type.",
+        "`{{module}}.{{member}}` turns every error in the channel into a defect, including ones added later, and the types won't show it. Die only on the errors you mean with `{{module}}.catchTag('Tag', {{module}}.die)` or `catchTags`, so a new error stays in the error type.",
       catchDie:
-        "This catch turns every error in the channel into a defect, as `orDie` does, including ones added later. Die only on the errors you mean with `Effect.catchTag('Tag', Effect.die)` or `catchTags`, so a new error stays in the error type.",
+        "This catch turns every error in the channel into a defect, as `orDie` does, including ones added later. Die only on the errors you mean with `{{module}}.catchTag('Tag', {{module}}.die)` or `catchTags`, so a new error stays in the error type.",
       layerOrDie:
-        "`Layer.orDie` hides every construction failure of this layer as a defect, including ones added later. Leave them in the layer's error channel and handle them where the runtime is built, or die on the ones you mean with `Layer.catchTag`.",
+        "`Layer.orDie` hides every construction failure of this layer as a defect, including ones added later. Leave them in the layer's error channel and handle them where the runtime is built.",
     },
   },
   create(context) {
-    if (isTestFile(context.filename)) return {};
     const names = collectEffectModuleNames(context.sourceCode.ast);
 
     return {
@@ -87,14 +95,15 @@ export const noOrDieRule = defineRule({
         context.report({ node, messageId: 'orDie', data: { module, member } });
       },
       CallExpression(node) {
-        const caught = ORDIE_MODULES.some((module) => {
-          const member = moduleCallName(node, names, module);
+        const module = ORDIE_MODULES.find((candidate) => {
+          const member = moduleCallName(node, names, candidate);
           return member !== null && CATCH_ALL_MEMBERS.has(member);
         });
         // The handler is the last argument, data-first or data-last.
         const handler = node.arguments.at(-1);
-        if (!caught || handler === undefined || !alwaysDies(handler, names)) return;
-        context.report({ node, messageId: 'catchDie' });
+        if (module === undefined || handler === undefined) return;
+        if (!alwaysDies(handler, names, context.sourceCode)) return;
+        context.report({ node, messageId: 'catchDie', data: { module } });
       },
     };
   },

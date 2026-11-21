@@ -11,7 +11,7 @@ const orDie = (module: string, member: string) => ({
   messageId: 'orDie',
   data: { module, member },
 });
-const catchDie = { messageId: 'catchDie' };
+const catchDie = (module: string) => ({ messageId: 'catchDie', data: { module } });
 
 tester.run('anti-slop-effect/no-ordie', noOrDieRule, {
   valid: [
@@ -31,8 +31,8 @@ tester.run('anti-slop-effect/no-ordie', noOrDieRule, {
     );`,
     `${imports}
     const rows = list.pipe(Effect.catch(() => Effect.succeed([])));`,
-    // A broken fixture may stop a test run at once.
-    { filename: 'store.test.ts', code: `${imports}\nconst store = setup.pipe(Effect.orDie);` },
+    `${imports}
+    const changes = feed.pipe(Stream.catchTag('Disconnected', Stream.die));`,
     // Not Effect's modules.
     `import * as Effect from 'other-library';
     const value = risky.pipe(Effect.orDie, Effect.catch(Effect.die));`,
@@ -69,7 +69,21 @@ tester.run('anti-slop-effect/no-ordie', noOrDieRule, {
       const c = risky.pipe(Effect.catchAll((error) => {
         return Effect.dieMessage(String(error));
       }));`,
-      errors: [catchDie, catchDie, catchDie],
+      errors: [catchDie('Effect'), catchDie('Effect'), catchDie('Effect')],
+    },
+    {
+      code: `${imports}
+      const changes = feed.pipe(Stream.catch(Stream.die));`,
+      errors: [catchDie('Stream')],
+    },
+    // A handler declared apart from the catch.
+    {
+      code: `${imports}
+      const handler = (error: Error) => Effect.die(error);
+      function escalate(error: Error) { return Effect.die(error); }
+      const a = risky.pipe(Effect.catch(handler));
+      const b = risky.pipe(Effect.catch(escalate));`,
+      errors: [catchDie('Effect'), catchDie('Effect')],
     },
   ],
 });

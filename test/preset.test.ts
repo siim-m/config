@@ -109,19 +109,21 @@ test('the oxlint preset lets tests throw inside Effect.gen', () => {
   assert.ok(!reported.get('test/fixture/effect/throw.test.ts')?.includes(rule), output);
 });
 
-test('the oxlint preset reports orDie outside tests', () => {
+test('the oxlint preset reports orDie outside tests and test directories', () => {
   const { output } = run('oxlint', [
     '--format=unix',
     '-c',
     'test/fixture/oxlint.config.mts',
     'test/fixture/effect/ordie.ts',
     'test/fixture/effect/ordie.test.ts',
+    'test/fixture/effect/tests/helpers.ts',
   ]);
 
   const rule = 'anti-slop-effect(no-ordie)';
   const reported = reportedRules(output);
   assert.ok(reported.get('test/fixture/effect/ordie.ts')?.includes(rule), output);
   assert.ok(!reported.get('test/fixture/effect/ordie.test.ts')?.includes(rule), output);
+  assert.ok(!reported.get('test/fixture/effect/tests/helpers.ts')?.includes(rule), output);
 });
 
 test('the React preset adds its plugins and rules on top of the base', () => {

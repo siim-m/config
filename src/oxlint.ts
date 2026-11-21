@@ -85,8 +85,9 @@ const preset = {
     {
       files: TEST_FILES,
       rules: {
-        // A test may throw inside Effect.gen to fail on purpose.
+        // A test may throw inside Effect.gen to fail on purpose, or die on a broken fixture.
         'anti-slop-effect/throw-in-effect-gen': 'off',
+        'anti-slop-effect/no-ordie': 'off',
       },
     },
   ],

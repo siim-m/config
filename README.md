@@ -48,10 +48,12 @@ type-assertion and React effect rules ask for those.
 
 A doc on part of an export's API counts as an export doc: a member of an exported type or class, a
 variant of an exported union, and in a `.svelte` file a member of the props type that `$props()`
-names. Document the component itself in a `<!-- @component -->` comment in the markup, which oxlint
-doesn't read. A suppression is an `oxlint-disable` or `eslint-disable` comment, a `@ts-` directive,
-an `@effect-diagnostics` directive that turns a check `off`, or `svelte-ignore`. A one-word language
-hint for editors before a template literal, such as `/* glsl */`, stays too.
+names. oxlint reads each `<script>` block on its own, so declare that type in the same block as
+`$props()`, or export it from `<script module>`. Document the component itself in a
+`<!-- @component -->` comment in the markup, which oxlint doesn't read. A suppression is an
+`oxlint-disable` or `eslint-disable` comment, a `@ts-` directive, an `@effect-diagnostics` directive
+that turns a check `off` or `skip-file`, or `svelte-ignore`. A one-word language hint for editors
+before a template literal, such as `/* glsl */`, stays too.
 
 A file whose exports need longer docs, such as a library's public API, turns on
 `multilineExportDocs` in an override. The override replaces the rule's options, so repeat any others
@@ -66,11 +68,13 @@ overrides: [
 ## Effect
 
 `anti-slop-effect/no-ordie` reports `Effect.orDie`, `Stream.orDie`, `Layer.orDie` and a `catch`
-whose handler only dies, outside test files. Each one turns every error in the channel into a
-defect, including errors added to it later, and the types don't show it. Die only on the errors you
-mean, with `Effect.catchTag('ConfigMissing', Effect.die)` or `catchTags`, so a new error stays in
-the error type. The tsconfig turns off the language service's `catchDieToOrDie`, which would ask for
-`orDie` in place of such a catch.
+whose handler only dies. Each one turns every error in the channel into a defect, including errors
+added to it later, and the types don't show it. Die only on the errors you mean, with
+`Effect.catchTag('ConfigMissing', Effect.die)` or `catchTags`, so a new error stays in the error
+type. The preset turns the rule off in test files, where a broken fixture may stop the run, and the
+tsconfig turns off the language service's `catchDieToOrDie`, which would ask for `orDie` in place of
+such a catch. The rule replaces `no-ordie-in-service-construction` from 0.5.0; oxlint won't load a
+config that still names the old rule, so rename or remove it there.
 
 `anti-slop-effect/no-service-parameters` reports a function parameter typed as a service, such as
 `(mailer: MailerShape, to: string) => mailer.send(to)`. Get the service from context where the
