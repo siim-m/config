@@ -30,6 +30,14 @@ const nameWords = (name: string): ReadonlySet<string> =>
     )
   );
 
+/** Whether a doc says nothing but the words of the name it documents. */
+function restatesName(lines: readonly string[], name: string): boolean {
+  if (lines.some((line) => line.startsWith('@'))) return false;
+  const words = contentWords(lines.join(' '));
+  const fromName = nameWords(name);
+  return words.length > 0 && words.length <= 6 && words.every((word) => fromName.has(word));
+}
+
 const isDoc = (comment: Comment): boolean =>
   comment.type === 'Block' && comment.value.startsWith('*');
 
@@ -248,14 +256,6 @@ export const commentsRule = defineRule({
       members.push(node);
     };
 
-    /** Whether a doc says nothing but the words of the name it documents. */
-    const restatesName = (lines: readonly string[], name: string): boolean => {
-      if (lines.some((line) => line.startsWith('@'))) return false;
-      const words = contentWords(lines.join(' '));
-      const fromName = nameWords(name);
-      return words.length > 0 && words.length <= 6 && words.every((word) => fromName.has(word));
-    };
-
     /** The first problem with a comment, as a message id and its data. */
     const problem = (
       lines: readonly string[],
@@ -264,10 +264,11 @@ export const commentsRule = defineRule({
     ): readonly [string, Record<string, string | number>?] | undefined => {
       if (kind === 'other' && !isTagged(lines[0] ?? '')) return ['untagged', { prefixes }];
       const exempt = kind === 'exportDoc' && options.multilineExportDocs;
-      if (!exempt && lines.length > 1)
-        return [kind === 'exportDoc' ? 'multiLineDoc' : 'multiLine'];
-      const words = lines.join(' ').split(/\s+/u).filter((word) => word !== '').length;
-      if (!exempt && words > options.maxWords) return ['tooLong', { words, max: options.maxWords }];
+      if (!exempt) {
+        if (lines.length > 1) return [kind === 'exportDoc' ? 'multiLineDoc' : 'multiLine'];
+        const words = lines.join(' ').split(/\s+/u).filter((word) => word !== '').length;
+        if (words > options.maxWords) return ['tooLong', { words, max: options.maxWords }];
+      }
       if (name !== undefined && restatesName(lines, name)) return ['restatesName'];
       return undefined;
     };
@@ -284,11 +285,11 @@ export const commentsRule = defineRule({
       Property: collect,
       'Program:exit'(program) {
         const exportedNodes = exportedStatements(program, sourceCode);
-        /** Export docs by where they start, with the name each documents. */
+        /** Export docs by where they start, with the name each documents: the first, when one declaration exports several. */
         const exportDocs = new Map<number, string | undefined>();
         const addDoc = (target: ESTree.Node, name: string | undefined) => {
           const doc = docBefore(target, sourceCode);
-          if (doc !== undefined) exportDocs.set(doc.start, name);
+          if (doc !== undefined && !exportDocs.has(doc.start)) exportDocs.set(doc.start, name);
         };
         for (const node of exportedNodes) addDoc(docTarget(node), nameOf(node));
         for (const member of members)
@@ -310,8 +311,7 @@ export const commentsRule = defineRule({
             (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
           const lines = group.flatMap(textLines);
           if (licence || lines.length === 0) continue;
-          const exportDoc = group.length === 1 && exportDocs.has(first.start);
-          const kind = exportDoc
+          const kind = exportDocs.has(first.start)
             ? 'exportDoc'
             : ownLine(first) && suppressionFollows(groups, index, ownLine)
               ? 'reason'

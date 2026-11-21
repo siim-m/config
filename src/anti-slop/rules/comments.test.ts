@@ -129,6 +129,10 @@ tester.run('anti-slop/comments', commentsRule, {
       errors: [{ messageId: 'restatesName' }],
     },
     {
+      code: '/** Total seconds. */\nconst totalSeconds = 1,\n  elapsed = 2;\nexport { totalSeconds, elapsed };',
+      errors: [{ messageId: 'restatesName' }],
+    },
+    {
       code: '/**\n * Load the user.\n */\nexport function loadUser() {}',
       options: multilineDocs,
       errors: [{ messageId: 'restatesName' }],
