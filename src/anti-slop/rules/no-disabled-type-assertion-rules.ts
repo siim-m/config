@@ -32,7 +32,8 @@ function directiveRules(value: string): readonly string[] | null {
 
 /**
  * Oxlint applies a disable to a built-in rule by the name after the slash, whatever the prefix, and
- * a disable with no prefix to that name in every plugin.
+ * a disable with no prefix to that built-in rule too. A bare name doesn't reach a JS plugin rule, so
+ * reporting one only flags a disable that does nothing.
  */
 function isTypeAssertionRule(typeAssertionRules: ReadonlySet<string>, rule: string): boolean {
   if (typeAssertionRules.has(rule)) return true;

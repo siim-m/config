@@ -42,7 +42,8 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
   combinator it doesn't know such as `Schedule.while`, as unknown; treats `times: undefined` as no
   limit; and reads `Schedule.concatResult` like `concat`.
 - `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
-  `.pipe(Effect.tapError(...))` counts as logged.
+  `.pipe(Effect.tapError(...))` counts as logged, and a yielded value bound to a name, such as
+  `const ref = yield* Ref.make(0)`, is not a constructed error.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
   `effect/LICENSE-enfect`).
 - `effect/shared/effect-modules.ts`, which the four rules share.

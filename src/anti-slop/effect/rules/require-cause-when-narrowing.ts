@@ -1,4 +1,5 @@
-// Changed from the fork: a data-first source built with `.pipe(Effect.tapError(...))` counts as logged.
+// Changed from the fork: a data-first source built with `.pipe(Effect.tapError(...))` counts as logged, and a
+// yielded value bound to a name, such as `const ref = yield* Ref.make(0)`, is not a constructed error.
 import { defineRule } from "@oxlint/plugins";
 
 import type { ESTree, SourceCode } from "@oxlint/plugins";
@@ -90,7 +91,10 @@ function constructedErrors(handler: FunctionNode, names: EffectModuleNames): rea
 			const [argument] = node.arguments;
 			if (argument !== undefined) consider(argument);
 		}
-		if (node.type === "YieldExpression" && node.delegate && node.argument !== null) consider(node.argument);
+		// A yielded value bound to a name, such as `const ref = yield* Ref.make(0)`, is not the error the handler fails with.
+		if (node.type === "YieldExpression" && node.delegate && node.argument !== null && node.parent.type !== "VariableDeclarator") {
+			consider(node.argument);
+		}
 		return true;
 	});
 	return [...new Set(found)];

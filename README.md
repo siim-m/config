@@ -41,8 +41,9 @@ them too, and oxlint gives a rule no way to report that, so catch one in review.
 
 `anti-slop/comments` holds a comment to a short why. By default a comment gets 30 words, a doc
 comment on an export 45, and it may cite one issue. It also reports section dividers, test step
-labels, commented-out code, TODOs without a link, JSDoc types in TypeScript, and comments that only
-repeat the name below them. `forbidden` adds patterns of your own:
+labels, commented-out code, TODOs without a link, JSDoc types in TypeScript, JSDoc tags with nothing
+after them, and comments that only repeat the name below them. `forbidden` adds patterns of your
+own:
 
 ```ts
 'anti-slop/comments': ['error', {
@@ -53,8 +54,8 @@ repeat the name below them. `forbidden` adds patterns of your own:
 
 `policy: 'tagged-only'` goes further: only directives, licence headers, doc comments on exports, the
 reason above a suppression and comments that start with an `allow` prefix stay. The prefixes default
-to `SAFETY`, `SYNC` and `WARNING`, which the type-assertion and React effect rules ask for; an
-`allow` list replaces them, so keep those three in it.
+to `SAFETY`, `SYNC` and `WARNING`. An `allow` list replaces them, so keep `SAFETY` and `SYNC` in it:
+the type-assertion and React effect rules ask for those.
 
 ## Tests and shortcuts
 
