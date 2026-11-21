@@ -56,9 +56,16 @@ function commentGroups(
   return groups;
 }
 
-/** The doc comment directly above a node, looking past directives such as `oxlint-disable-next-line`. */
+/**
+ * The doc comment directly above a node, looking past directives such as `oxlint-disable-next-line`
+ * and, for a union variant, past the `|` in front of it.
+ */
 function docBefore(node: ESTree.Node, sourceCode: SourceCode): Comment | undefined {
-  const comments = sourceCode.getCommentsBefore(node);
+  let comments = sourceCode.getCommentsBefore(node);
+  const token = sourceCode.getTokenBefore(node);
+  if (comments.length === 0 && node.parent?.type === 'TSUnionType' && token?.value === '|') {
+    comments = sourceCode.getCommentsBefore(token);
+  }
   let comment = comments.pop();
   while (comment !== undefined && !isDoc(comment) && textLines(comment).length === 0)
     comment = comments.pop();
@@ -242,6 +249,9 @@ export const commentsRule = defineRule({
       PropertyDefinition: collect,
       MethodDefinition: collect,
       Property: collect,
+      TSUnionType(node) {
+        members.push(...node.types);
+      },
       'Program:exit'(program) {
         const exportedNodes = exportedStatements(program, sourceCode);
         /** Where each export doc starts. */

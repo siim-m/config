@@ -24,6 +24,10 @@ tester.run('anti-slop/comments', commentsRule, {
     'export interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}',
     'export class Store {\n  /** Loads one row. */\n  load() {}\n}',
     '/** Creates a new user. */\nexport function user() {}',
+    // A variant of an exported union is part of its shape, with the doc before or after the `|`.
+    'export type Phase = /** Idle. */ "idle" | /** Running. */ "running";',
+    'export type Command =\n  /** Moves a corner. */\n  | { readonly _tag: "Move"; /** The corner. */ readonly index: number }\n  /** Removes a corner. */\n  | { readonly _tag: "Remove" };',
+    'export interface Pack {\n  readonly callout:\n    | /** A note. */ { readonly kind: "note" }\n    | { readonly kind: "none" };\n}',
     // Exports declared apart from their declaration.
     '/** Loads one row. */\nfunction load() {}\nexport default load;',
     'interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}\nexport type { Row };',
@@ -57,6 +61,15 @@ tester.run('anti-slop/comments', commentsRule, {
       errors: [{ messageId: 'untagged' }],
     },
     { code: '// SAFETY:\nconst a = b as C;', errors: [{ messageId: 'untagged' }] },
+    // A union that isn't exported, or that sits in an exported function's body, documents nothing public.
+    {
+      code: 'type Phase =\n  /** Idle. */\n  | "idle"\n  | "running";',
+      errors: [{ messageId: 'untagged' }],
+    },
+    {
+      code: 'export function f() {\n  type T = /** Hidden. */ "a" | "b";\n}',
+      errors: [{ messageId: 'untagged' }],
+    },
     // Inside an exported function's body is not the export's API.
     {
       code: 'export const run = () => configure({ /** Why. */ debug: true });',
