@@ -40,10 +40,42 @@ tester.run('anti-slop/no-shared-array-sort', noSharedArraySortRule, {
     const a = (xs: number[]) => Array.sort(xs, order);
     const b = (xs: number[]) => Arr.reverse(xs);
     const c = (xs: Chunk.Chunk<number>) => Chunk.sort(xs, order);`,
+    // Optional chains and computed names read like plain calls.
+    `function names(rows?: Row[]) {
+      const out = rows?.map(name) ?? [];
+      out?.sort();
+      return out['slice']().reverse();
+    }`,
+    // A sort that takes arguments an array's sort can't, such as a query builder's.
+    'const recent = () => Model.find().sort({ date: -1 });',
+    'const ranked = (xs: number[]) => R.sort(byScore, xs);',
+    // A directory listing is a new array, read directly, awaited, or yielded from an Effect.
+    `const a = (dir: string) => NodeFS.readdirSync(dir).sort();
+    const b = async (dir: string) => (await NodeFSP.readdir(dir)).sort();
+    const c = (dir: string) => Effect.gen(function* () { return (yield* fs.readDirectory(dir)).sort(); });`,
     // A type assertion around a fresh array doesn't hide it.
     'const sorted = (xs: number[]) => (xs.slice() as number[]).sort();',
   ],
   invalid: [
+    // A binding whose initializer refers to itself is unknown, not a crash.
+    { code: 'function f() { var list = list || []; list.sort(); }', errors: [shared('sort')] },
+    // A destructured element is whatever the array held.
+    {
+      code: 'function f(xs: number[], groups: Groups) { const [out] = [xs]; out.sort(); const [first] = Object.values(groups); first.reverse(); }',
+      errors: [shared('sort'), shared('reverse')],
+    },
+    // A shadowed Object or Array isn't the global one.
+    {
+      code: 'function f(Object: { values(x: unknown): number[] }, xs: unknown) { return Object.values(xs).sort(); }',
+      errors: [shared('sort')],
+    },
+    // A package that only starts with "effect" isn't Effect.
+    {
+      code: "import { xs } from 'effectful';\nexport const f = () => xs.reverse();",
+      errors: [shared('reverse')],
+    },
+    { code: 'const f = (xs: number[]) => xs["sort"]();', errors: [shared('sort')] },
+    { code: 'const f = async () => (await loadRows()).sort();', errors: [shared('sort')] },
     // A parameter, property or import belongs to the caller.
     { code: 'function order(xs: number[]) { xs.sort(); }', errors: [shared('sort')] },
     { code: 'const flip = (xs: number[]) => xs.reverse();', errors: [shared('reverse')] },
