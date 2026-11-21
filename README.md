@@ -40,23 +40,22 @@ them too, and oxlint gives a rule no way to report that, so catch one in review.
 
 ## Comments
 
-`anti-slop/comments` holds a comment to a short why. By default a comment gets 30 words, a doc
-comment on an export 45, and it may cite one issue. It also reports section dividers, test step
-labels, commented-out code, TODOs without a link, JSDoc types in TypeScript, empty `@param` and
-`@returns` (or `@return`) tags, and comments that only repeat the name below them. `forbidden` adds
-patterns of your own:
+`anti-slop/comments` keeps only the comments the code can't replace: directives, licence headers,
+doc comments on exports, the reason above a suppression and comments that start with an `allow`
+prefix. Each gets one line of at most 30 words (`maxWords`), and a doc comment that only repeats the
+name below it is reported. The prefixes default to `SAFETY`, `SYNC` and `WARNING`. An `allow` list
+replaces them, so keep `SAFETY` and `SYNC` in it: the type-assertion and React effect rules ask for
+those.
+
+A file whose exports need longer docs, such as a library's public API, turns on
+`multilineExportDocs` in an override. The override replaces the rule's options, so repeat any others
+you set:
 
 ```ts
-'anti-slop/comments': ['error', {
-  maxWords: 30,
-  forbidden: [{ pattern: '\\b\\d{4}-\\d{2}-\\d{2}\\b', message: 'Leave dates to git.' }],
-}],
+overrides: [
+  { files: ['src/api.ts'], rules: { 'anti-slop/comments': ['error', { multilineExportDocs: true }] } },
+],
 ```
-
-`policy: 'tagged-only'` goes further: only directives, licence headers, doc comments on exports, the
-reason above a suppression and comments that start with an `allow` prefix stay. The prefixes default
-to `SAFETY`, `SYNC` and `WARNING`. An `allow` list replaces them, so keep `SAFETY` and `SYNC` in it:
-the type-assertion and React effect rules ask for those.
 
 ## Tests and shortcuts
 
