@@ -55,10 +55,10 @@ function isFresh(
   expression: ESTree.Node,
   call: ESTree.Node,
   sourceCode: SourceCode,
-  visited: Set<Variable>
+  known: Map<Variable, boolean>
 ): boolean {
   const node = unwrapArrayExpression(expression);
-  const fresh = (part: ESTree.Node) => isFresh(part, call, sourceCode, visited);
+  const fresh = (part: ESTree.Node) => isFresh(part, call, sourceCode, known);
   if (node.type === 'ArrayExpression') return true;
   // `await fsp.readdir(dir)` holds what the call returns.
   if (node.type === 'AwaitExpression') return fresh(node.argument);
@@ -87,8 +87,12 @@ function isFresh(
     );
   }
   const variable = resolveArrayBinding(sourceCode, node);
-  if (variable === null || visited.has(variable)) return false;
-  visited.add(variable);
+  if (variable === null) return false;
+  // A binding still being checked, as in `var list = list || []`, reads as not fresh. Every part
+  // must be fresh, so that can't hide a fresh array, and a finished check is reused.
+  const cached = known.get(variable);
+  if (cached !== undefined) return cached;
+  known.set(variable, false);
   const [definition] = variable.defs;
   const declarator = definition?.node;
   const reassigned = variable.references.some(
@@ -105,8 +109,7 @@ function isFresh(
     !reassigned &&
     sameFunction &&
     fresh(declarator.init);
-  // `visited` guards only the current path, so both arms of `c ? out : out` may reach `out`.
-  visited.delete(variable);
+  known.set(variable, result);
   return result;
 }
 
@@ -161,7 +164,7 @@ export const noSharedArraySortRule = defineRule({
         const called = arrayMethodTarget(node.callee);
         if (called === null || !IN_PLACE.has(called.name)) return;
         if (!fitsArrayMethod(called.name, node) || isModule(called.object, sourceCode)) return;
-        if (isFresh(called.object, node, sourceCode, new Set())) return;
+        if (isFresh(called.object, node, sourceCode, new Map())) return;
         context.report({ node, messageId: 'shared', data: { method: called.name } });
       },
     };
