@@ -46,6 +46,13 @@ prefix. Each gets one line of at most 30 words (`maxWords`). The prefixes defaul
 `SYNC` and `WARNING`. An `allow` list replaces them, so keep `SAFETY` and `SYNC` in it: the
 type-assertion and React effect rules ask for those.
 
+A doc on part of an export's API counts as an export doc: a member of an exported type or class, a
+variant of an exported union, and in a `.svelte` file a member of the props type that `$props()`
+names. Document the component itself in a `<!-- @component -->` comment in the markup, which oxlint
+doesn't read. A suppression is an `oxlint-disable` or `eslint-disable` comment, a `@ts-` directive,
+an `@effect-diagnostics` directive that turns a check `off`, or `svelte-ignore`. A one-word language
+hint for editors before a template literal, such as `/* glsl */`, stays too.
+
 A file whose exports need longer docs, such as a library's public API, turns on
 `multilineExportDocs` in an override. The override replaces the rule's options, so repeat any others
 you set:
@@ -55,6 +62,22 @@ overrides: [
   { files: ['src/api.ts'], rules: { 'anti-slop/comments': ['error', { multilineExportDocs: true }] } },
 ],
 ```
+
+## Effect
+
+`anti-slop-effect/no-ordie` reports `Effect.orDie`, `Stream.orDie`, `Layer.orDie` and a `catch`
+whose handler only dies, outside test files. Each one turns every error in the channel into a
+defect, including errors added to it later, and the types don't show it. Die only on the errors you
+mean, with `Effect.catchTag('ConfigMissing', Effect.die)` or `catchTags`, so a new error stays in
+the error type. The tsconfig turns off the language service's `catchDieToOrDie`, which would ask for
+`orDie` in place of such a catch.
+
+`anti-slop-effect/no-service-parameters` reports a function parameter typed as a service, such as
+`(mailer: MailerShape, to: string) => mailer.send(to)`. Get the service from context where the
+caller is built instead. A type that a service class names as its shape counts only when it has
+operations (methods, or members typed as functions, Effects or Streams), so a function can take a
+plain data type, such as the signed-in user, even when a service provides it. List services that
+callers may pass along anyway, such as request context, in `exempt`.
 
 ## Tests and shortcuts
 
@@ -97,12 +120,27 @@ three rules of its own:
 In `.tsx` files a number can't be a condition, because `{count && <p />}` renders `0`. Write
 `count > 0`.
 
+## Oxlint's `suspicious` category
+
+The preset doesn't turn this category on. A project that does will see these rules misfire on
+deliberate code:
+
+- `unicorn/consistent-function-scoping` reports helpers inside a Playwright `page.evaluate`
+  callback. The browser runs the callback from its source, so a hoisted helper isn't there. Suppress
+  these inline with a reason.
+- `unicorn/no-array-sort` and `unicorn/no-array-reverse` can't tell an array that `map`, `filter` or
+  `Object.keys` just made from one the code doesn't own, and ask for `toSorted` and `toReversed`,
+  which need ES2023. `allowAfterSpread` only accepts `[...xs].sort()`, so code that sorts the result
+  of `map` has to turn both off.
+- `eslint/no-useless-constructor` reports `constructor() { super(); }`, which narrows a subclass's
+  constructor, such as a `Map` subclass that takes no entries.
+
 ## License
 
 MIT. The anti-slop rules are MIT, copyright Dillon Mulroy; `require-readable-spacing` uses MIT code
 from ESLint Stylistic. The `anti-slop-react` rules are MIT, copyright T3 Tools Inc.: rewritten from
 T3 Code's `oxlint-plugin-t3code` at `2de3370`, and not kept in step with it. `anti-slop/comments`
-and `anti-slop/require-suppression-reason` adapt code from the same plugin. Four `anti-slop-effect`
+and `anti-slop/require-suppression-reason` adapt code from the same plugin. Three `anti-slop-effect`
 rules and `no-disabled-type-assertion-rules` are MIT, from Kyle Mistele's fork of anti-slop;
 `throw-in-effect-gen` there is ported from enfect, MIT, copyright Marc Suesser, and
 `no-unbounded-retry` from cevr/effect-oxlint, MIT. eslint-plugin-ai-guard and @interfere/landmines
