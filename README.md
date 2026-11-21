@@ -42,10 +42,9 @@ them too, and oxlint gives a rule no way to report that, so catch one in review.
 
 `anti-slop/comments` keeps only the comments the code can't replace: directives, licence headers,
 doc comments on exports, the reason above a suppression and comments that start with an `allow`
-prefix. Each gets one line of at most 30 words (`maxWords`), and a doc comment that only repeats the
-name below it is reported. The prefixes default to `SAFETY`, `SYNC` and `WARNING`. An `allow` list
-replaces them, so keep `SAFETY` and `SYNC` in it: the type-assertion and React effect rules ask for
-those.
+prefix. Each gets one line of at most 30 words (`maxWords`). The prefixes default to `SAFETY`,
+`SYNC` and `WARNING`. An `allow` list replaces them, so keep `SAFETY` and `SYNC` in it: the
+type-assertion and React effect rules ask for those.
 
 A file whose exports need longer docs, such as a library's public API, turns on
 `multilineExportDocs` in an override. The override replaces the rule's options, so repeat any others

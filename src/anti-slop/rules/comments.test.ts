@@ -33,6 +33,8 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '/**\n * Loads one row.\n *\n * @param id the row to load, never a draft\n */\nexport function load(id: string) { return id; }',
       options: multilineDocs,
     },
+    // The rule doesn't judge what an export's doc says, so one that repeats the name stays.
+    '/** Load the user. */\nexport function loadUser() {}',
     // The reason above a suppression is what require-suppression-reason asks for.
     '// The CLI prints its result.\n// oxlint-disable-next-line no-console\nconsole.log(1);',
     '// The CLI prints its result.\n// prettier-ignore\n// oxlint-disable-next-line no-console\nconsole.log(1);',
@@ -112,30 +114,6 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '/** One two three four five. */\nexport const a = 1;',
       options: [{ maxWords: 4 }],
       errors: [{ messageId: 'tooLong' }],
-    },
-    // An export's doc that only repeats the name says nothing.
-    { code: '/** Load the user. */\nexport function loadUser() {}', errors: [{ messageId: 'restatesName' }] },
-    {
-      code: '/** The total seconds */\nexport const totalSeconds = 1;',
-      errors: [{ messageId: 'restatesName' }],
-    },
-    {
-      code: "export enum State {\n  /** In progress. */\n  'in-progress' = 1,\n}",
-      errors: [{ messageId: 'restatesName' }],
-    },
-    // The doc is held to the binding that is exported, not the first one declared.
-    {
-      code: '/** The total seconds. */\nconst a = 1,\n  totalSeconds = 2;\nexport { totalSeconds };',
-      errors: [{ messageId: 'restatesName' }],
-    },
-    {
-      code: '/** Total seconds. */\nconst totalSeconds = 1,\n  elapsed = 2;\nexport { totalSeconds, elapsed };',
-      errors: [{ messageId: 'restatesName' }],
-    },
-    {
-      code: '/**\n * Load the user.\n */\nexport function loadUser() {}',
-      options: multilineDocs,
-      errors: [{ messageId: 'restatesName' }],
     },
   ],
 });

@@ -12,32 +12,6 @@ const DIRECTIVE =
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
 const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
-const FILLER = new Set(
-  'a an the of for to in on at by with from and or is are be this that it its as'.split(' ')
-);
-
-/** The words a comment or name carries once filler words go and plurals fold. */
-const contentWords = (text: string): readonly string[] =>
-  (text.toLowerCase().match(/[a-z0-9]+/gu) ?? [])
-    .filter((word) => !FILLER.has(word))
-    .map((word) => (word.length > 3 ? word.replace(/([^s])s$/u, '$1') : word))
-    .filter((word) => !FILLER.has(word));
-
-const nameWords = (name: string): ReadonlySet<string> =>
-  new Set(
-    contentWords(
-      name.replace(/([a-z0-9])([A-Z])/gu, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/gu, '$1 $2')
-    )
-  );
-
-/** Whether a doc says nothing but the words of the name it documents. */
-function restatesName(lines: readonly string[], name: string): boolean {
-  if (lines.some((line) => line.startsWith('@'))) return false;
-  const words = contentWords(lines.join(' '));
-  const fromName = nameWords(name);
-  return words.length > 0 && words.length <= 6 && words.every((word) => fromName.has(word));
-}
-
 const isDoc = (comment: Comment): boolean =>
   comment.type === 'Block' && comment.value.startsWith('*');
 
@@ -141,19 +115,6 @@ function exportedStatements(
 const docTarget = (node: ESTree.Node): ESTree.Node =>
   node.type === 'VariableDeclarator' && node.parent !== null ? node.parent : node;
 
-/** The name a declaration or member declares, for the doc comment above it. */
-function nameOf(node: ESTree.Node): string | undefined {
-  let target: ESTree.Node | null = node;
-  if (target.type === 'ExportNamedDeclaration' || target.type === 'ExportDefaultDeclaration')
-    target = target.declaration;
-  if (target?.type === 'VariableDeclaration') target = target.declarations[0] ?? null;
-  if (target === null) return undefined;
-  const id = 'key' in target ? target.key : 'id' in target ? target.id : undefined;
-  if (id?.type === 'Identifier') return id.name;
-  if (id?.type === 'Literal' && typeof id.value === 'string') return id.value;
-  return undefined;
-}
-
 /**
  * Whether a suppression directive follows a comment group on the next lines, past other
  * directives, so the group is its reason, as `require-suppression-reason` reads it.
@@ -205,7 +166,7 @@ function isExposedMember(member: ESTree.Node, exported: ReadonlySet<ESTree.Node>
 /**
  * Keep only comments that carry what the code can't: directives, licence headers, docs on exports,
  * the reason above a suppression and comments that start with an allowed prefix such as `SAFETY:`.
- * Each gets one line, a word limit and no doc that only repeats the name below it.
+ * Each gets one line and a word limit.
  */
 export const commentsRule = defineRule({
   meta: {
@@ -239,7 +200,6 @@ export const commentsRule = defineRule({
       multiLineDoc:
         'Keep this doc to one line. A file whose exports need longer docs sets `multilineExportDocs` in an override.',
       tooLong: 'This comment has {{words}} words; the limit is {{max}}.',
-      restatesName: 'This doc only repeats the name below it. Say why, or say nothing.',
     },
   },
   create(context) {
@@ -259,8 +219,7 @@ export const commentsRule = defineRule({
     /** The first problem with a comment, as a message id and its data. */
     const problem = (
       lines: readonly string[],
-      kind: 'exportDoc' | 'reason' | 'other',
-      name: string | undefined
+      kind: 'exportDoc' | 'reason' | 'other'
     ): readonly [string, Record<string, string | number>?] | undefined => {
       if (kind === 'other' && !isTagged(lines[0] ?? '')) return ['untagged', { prefixes }];
       const exempt = kind === 'exportDoc' && options.multilineExportDocs;
@@ -269,7 +228,6 @@ export const commentsRule = defineRule({
         const words = lines.join(' ').split(/\s+/u).filter((word) => word !== '').length;
         if (words > options.maxWords) return ['tooLong', { words, max: options.maxWords }];
       }
-      if (name !== undefined && restatesName(lines, name)) return ['restatesName'];
       return undefined;
     };
 
@@ -285,15 +243,14 @@ export const commentsRule = defineRule({
       Property: collect,
       'Program:exit'(program) {
         const exportedNodes = exportedStatements(program, sourceCode);
-        /** Export docs by where they start, with the name each documents: the first, when one declaration exports several. */
-        const exportDocs = new Map<number, string | undefined>();
-        const addDoc = (target: ESTree.Node, name: string | undefined) => {
+        /** Where each export doc starts. */
+        const exportDocs = new Set<number>();
+        const addDoc = (target: ESTree.Node) => {
           const doc = docBefore(target, sourceCode);
-          if (doc !== undefined && !exportDocs.has(doc.start)) exportDocs.set(doc.start, name);
+          if (doc !== undefined) exportDocs.add(doc.start);
         };
-        for (const node of exportedNodes) addDoc(docTarget(node), nameOf(node));
-        for (const member of members)
-          if (isExposedMember(member, exportedNodes)) addDoc(member, nameOf(member));
+        for (const node of exportedNodes) addDoc(docTarget(node));
+        for (const member of members) if (isExposedMember(member, exportedNodes)) addDoc(member);
         const codeStart = program.body[0]?.start ?? sourceCode.text.length;
 
         const groups = commentGroups(sourceCode.getAllComments(), sourceCode.text);
@@ -316,7 +273,7 @@ export const commentsRule = defineRule({
             : ownLine(first) && suppressionFollows(groups, index, ownLine)
               ? 'reason'
               : 'other';
-          const found = problem(lines, kind, exportDocs.get(first.start));
+          const found = problem(lines, kind);
           if (found === undefined) continue;
           const [messageId, data] = found;
           context.report({ loc: { start: first.loc.start, end: last.loc.end }, messageId, data });
