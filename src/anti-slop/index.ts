@@ -1,5 +1,8 @@
 import { eslintCompatPlugin } from "@oxlint/plugins";
 
+import { commentsRule } from "./rules/comments.ts";
+import { noDisabledTypeAssertionRulesRule } from "./rules/no-disabled-type-assertion-rules.ts";
+import { requireSuppressionReasonRule } from "./rules/require-suppression-reason.ts";
 import { noReduceAccumulatorCopyRule } from "./rules/no-reduce-accumulator-copy.ts";
 import { noChainedTypeAssertionsRule } from "./rules/no-chained-type-assertions.ts";
 import { noConditionalEmptyObjectSpreadRule } from "./rules/no-conditional-empty-object-spread.ts";
@@ -22,9 +25,11 @@ import { requireSafetyCommentForTypeAssertionRule } from "./rules/require-safety
 const antiSlopPlugin = eslintCompatPlugin({
 	meta: { name: "anti-slop" },
 	rules: {
+		comments: commentsRule,
 		"no-reduce-accumulator-copy": noReduceAccumulatorCopyRule,
 		"no-chained-type-assertions": noChainedTypeAssertionsRule,
 		"no-conditional-empty-object-spread": noConditionalEmptyObjectSpreadRule,
+		"no-disabled-type-assertion-rules": noDisabledTypeAssertionRulesRule,
 		"no-known-value-widening": noKnownValueWideningRule,
 		"no-module-mocking": noModuleMockingRule,
 		"no-object-parameters": noObjectParametersRule,
@@ -38,6 +43,7 @@ const antiSlopPlugin = eslintCompatPlugin({
 		"no-widen-then-assert": noWidenThenAssertRule,
 		"require-pascal-case-namespace-imports": requirePascalCaseNamespaceImportsRule,
 		"require-readable-spacing": requireReadableSpacingRule,
+		"require-suppression-reason": requireSuppressionReasonRule,
 		"require-safety-comment-for-type-assertion": requireSafetyCommentForTypeAssertionRule,
 	},
 });

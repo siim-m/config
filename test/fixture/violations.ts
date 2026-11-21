@@ -19,9 +19,17 @@ export function each(values: number[]): void {
   });
 }
 
+// TODO: remove before release.
 export function pause(): void {
   debugger;
 }
+
+export function fail(): never {
+  throw 'failed';
+}
+
+// oxlint-disable-next-line anti-slop/no-chained-type-assertions
+export const count = 1;
 
 // Turned off in this fixture's oxlint.config.mts.
 export const value = Reflect.get({ a: 1 }, 'a');

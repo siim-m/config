@@ -38,17 +38,75 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
   assert.deepEqual(
     rules.get('test/fixture/violations.ts'),
     [
+      'anti-slop(comments)',
+      'anti-slop(no-disabled-type-assertion-rules)',
       'anti-slop(no-unknown-parameters)',
       'anti-slop(require-pascal-case-namespace-imports)',
       'anti-slop(require-readable-spacing)',
+      'anti-slop(require-suppression-reason)',
       'anti-slop-effect(prefer-effect-match)',
       'eslint(no-debugger)',
       'typescript(no-floating-promises)',
       'typescript(no-misused-promises)',
+      'typescript(only-throw-error)',
     ],
     output
   );
   assert.equal(rules.has('test/fixture/clean.ts'), false, output);
+});
+
+test('the oxlint preset reports tests that cannot fail or lean on time', () => {
+  const { status, output } = run('oxlint', [
+    '--type-aware',
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint.config.mts',
+    'test/fixture/honesty.test.ts',
+  ]);
+
+  assert.equal(status, 1, output);
+  // The first test asserts on a result, so it passes; each other test trips one rule, and the
+  // last trips two.
+  assert.deepEqual(
+    reportedRules(output).get('test/fixture/honesty.test.ts'),
+    [
+      'ai-guard(no-assertionless-test)',
+      'ai-guard(no-tautological-assertion)',
+      'landmines(no-fixed-sleep)',
+      'landmines(no-flake-masking)',
+    ],
+    output
+  );
+});
+
+test('the oxlint preset reports a cast rule disabled under another prefix', () => {
+  const { output } = run('oxlint', [
+    '--type-aware',
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint.config.mts',
+    'test/fixture/disables.ts',
+  ]);
+
+  // oxlint honours the disable, so the guard is what reports the cast.
+  const reported = reportedRules(output).get('test/fixture/disables.ts') ?? [];
+  assert.ok(reported.includes('anti-slop(no-disabled-type-assertion-rules)'), output);
+  assert.ok(!reported.includes('typescript(no-unsafe-type-assertion)'), output);
+});
+
+test('the oxlint preset lets tests throw inside Effect.gen', () => {
+  const { output } = run('oxlint', [
+    '--format=unix',
+    '-c',
+    'test/fixture/oxlint.config.mts',
+    'test/fixture/effect/throw.ts',
+    'test/fixture/effect/throw.test.ts',
+  ]);
+
+  const rule = 'anti-slop-effect(throw-in-effect-gen)';
+  const reported = reportedRules(output);
+  assert.ok(reported.get('test/fixture/effect/throw.ts')?.includes(rule), output);
+  assert.ok(!reported.get('test/fixture/effect/throw.test.ts')?.includes(rule), output);
 });
 
 test('the React preset adds its plugins and rules on top of the base', () => {

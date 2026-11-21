@@ -19,8 +19,42 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 ## Added
 
 - `rules/require-pascal-case-namespace-imports.ts`
+- `rules/comments.ts`, from the author's own `comment-budget` rule, with checks adapted from T3 Code's
+  `no-low-value-comments` (MIT, T3 Tools Inc.; see `../anti-slop-react/LICENSE`).
+- `rules/require-suppression-reason.ts`, adapted from T3 Code's rule of that name (MIT, T3 Tools
+  Inc.).
 - `effect/rules/no-service-parameters.ts` and `effect/baseline.ts`, with `exempt` and `baseline`
   options.
+
+## From Kyle Mistele's fork
+
+Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistele/anti-slop) at
+`13b0203` (2026-11-19), MIT. Unchanged except where "Changed" says:
+
+- `rules/no-disabled-type-assertion-rules.ts`. Changed: a built-in rule named under any prefix
+  or none, such as `ts/no-unsafe-type-assertion`, counts, since oxlint matches built-in rules by
+  name; the rule list ends at ` --` even with no space before the reason; and spaces or newlines
+  separate rule names as commas do.
+- `effect/rules/no-ordie-in-service-construction.ts`
+- `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT, which ships no
+  copyright notice). Changed:
+  - reads Effect 4's array form `Schedule.max([a, b])` and `Schedule.min([a, b])`;
+  - reads a schedule defined in terms of itself, a destructured binding, or a schedule passed
+    through a combinator it doesn't know, such as `Schedule.while`, as unknown;
+  - treats `times: undefined` as no limit, and reports options with no `schedule` and no `times`,
+    which retry on `Schedule.forever`;
+  - reads `Schedule.concatResult` like `concat`;
+  - says "no limit on attempts or time" rather than "never gives up".
+- `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
+  `.pipe(Effect.tapError(...))` counts as logged; neither a yielded value bound to a name, such as
+  `const ref = yield* Ref.make(0)`, nor the `make` of an Effect value module, such as
+  `Ref.make(0)` or `Queue.make()`, is a constructed error; and the message names `A.B` for
+  `new A.B(...)`.
+- `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
+  `effect/LICENSE-enfect`).
+- `effect/shared/effect-modules.ts`, which the four rules share.
+
+To update them, diff those files in the fork from `13b0203`.
 
 ## Changed upstream files
 
