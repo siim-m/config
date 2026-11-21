@@ -139,8 +139,9 @@ deliberate code:
   these inline with a reason.
 - `unicorn/no-array-sort` and `unicorn/no-array-reverse` can't tell an array that `map`, `filter` or
   `Object.keys` just made from one the code doesn't own, and ask for `toSorted` and `toReversed`,
-  which need ES2023. `allowAfterSpread` only accepts `[...xs].sort()`, so code that sorts the result
-  of `map` has to turn both off.
+  which need ES2023. Turn both off: the preset's `anti-slop/no-shared-array-sort` reports `sort()`
+  and `reverse()` only on an array the code didn't just make, such as a parameter, a property, a
+  module constant or a function's result, and skips Effect's `Array.sort`, which returns a copy.
 - `eslint/no-useless-constructor` reports `constructor() { super(); }`, which narrows a subclass's
   constructor, such as a `Map` subclass that takes no entries.
 

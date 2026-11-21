@@ -32,3 +32,5 @@ export function fail(): never {
 export const count = 1;
 
 export const value = Reflect.get({ a: 1 }, 'a');
+
+export const flip = (xs: number[]): number[] => xs.reverse();

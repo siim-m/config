@@ -40,6 +40,7 @@ test('the oxlint preset loads its plugins and reports one hit per rule in the fi
     [
       'anti-slop(comments)',
       'anti-slop(no-disabled-type-assertion-rules)',
+      'anti-slop(no-shared-array-sort)',
       'anti-slop(no-unknown-parameters)',
       'anti-slop(require-pascal-case-namespace-imports)',
       'anti-slop(require-readable-spacing)',

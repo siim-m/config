@@ -19,6 +19,8 @@ Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-v
 ## Added
 
 - `rules/require-pascal-case-namespace-imports.ts`
+- `rules/no-shared-array-sort.ts`, in place of `unicorn/no-array-sort` and `no-array-reverse`, which
+  can't tell a fresh array from a borrowed one.
 - `rules/comments.ts`, from the author's own `comment-budget` rule, with checks adapted from T3 Code's
   `no-low-value-comments` (MIT, T3 Tools Inc.; see `../anti-slop-react/LICENSE`).
 - `rules/require-suppression-reason.ts`, adapted from T3 Code's rule of that name (MIT, T3 Tools
