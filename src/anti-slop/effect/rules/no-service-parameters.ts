@@ -14,9 +14,27 @@ function exemptServices(option: unknown): ReadonlySet<string> {
   return new Set(exempt.filter((service): service is string => typeof service === 'string'));
 }
 
-/** Local type aliases, and the shapes local service classes name. */
-type TypeDeclarations = ReadonlyMap<string, ESTree.TSType | { readonly service: string }>;
+type LocalType = ESTree.TSInterfaceDeclaration | ESTree.TSTypeAliasDeclaration;
+
+/** What the file declares and imports, for telling a service's shape from other types. */
+interface TypeDeclarations {
+  /** Local interfaces and type aliases by name. */
+  readonly types: ReadonlyMap<string, LocalType>;
+  /** The shapes local service classes name, mapped to their class, when the shape holds operations. */
+  readonly shapes: ReadonlyMap<string, string>;
+  readonly imported: ReadonlySet<string>;
+}
 type FunctionNode = ESTree.Function | ESTree.ArrowFunctionExpression;
+
+/** Wrappers whose result is still part of the type they take, such as `Pick<MailerShape, 'send'>`. */
+const PART_OF: ReadonlySet<string> = new Set(['Pick', 'Omit', 'Partial', 'Required', 'Readonly']);
+/** Member types that make a shape a set of operations rather than data. */
+const OPERATION_TYPES: ReadonlySet<string> = new Set([
+  'Effect',
+  'Effect.Effect',
+  'Stream',
+  'Stream.Stream',
+]);
 
 function typeNameText(name: ESTree.TSTypeName): string {
   if (name.type === 'Identifier') return name.name;
@@ -42,12 +60,64 @@ function serviceShapeName(node: ESTree.Class): string | undefined {
   return undefined;
 }
 
-function collectTypeDeclarations(program: ESTree.Program): {
-  declarations: TypeDeclarations;
-  imported: ReadonlySet<string>;
-} {
-  const declarations = new Map<string, ESTree.TSType | { readonly service: string }>();
+const isOperationType = (type: ESTree.TSType): boolean =>
+  type.type === 'TSFunctionType' ||
+  (type.type === 'TSParenthesizedType' && isOperationType(type.typeAnnotation)) ||
+  (type.type === 'TSUnionType' && type.types.some(isOperationType)) ||
+  (type.type === 'TSTypeReference' && OPERATION_TYPES.has(typeNameText(type.typeName)));
+
+const isOperation = (member: ESTree.TSSignature): boolean =>
+  member.type === 'TSMethodSignature' ||
+  member.type === 'TSCallSignatureDeclaration' ||
+  (member.type === 'TSPropertySignature' &&
+    member.typeAnnotation !== null &&
+    isOperationType(member.typeAnnotation.typeAnnotation));
+
+/**
+ * Whether a local type declares an operation: a method, or a member typed as a function, an Effect
+ * or a Stream. A shape with none, such as the signed-in user, is data its callers may pass along.
+ */
+function hasOperations(
+  type: ESTree.TSType | LocalType,
+  types: ReadonlyMap<string, LocalType>,
+  seen: ReadonlySet<string>
+): boolean {
+  const local = (name: string): boolean => {
+    const declaration = types.get(name);
+    return (
+      declaration !== undefined &&
+      !seen.has(name) &&
+      hasOperations(declaration, types, new Set([...seen, name]))
+    );
+  };
+  switch (type.type) {
+    case 'TSInterfaceDeclaration':
+      return (
+        type.body.body.some(isOperation) ||
+        type.extends.some(
+          ({ expression }) => expression.type === 'Identifier' && local(expression.name)
+        )
+      );
+    case 'TSTypeAliasDeclaration':
+      return hasOperations(type.typeAnnotation, types, seen);
+    case 'TSTypeLiteral':
+      return type.members.some(isOperation);
+    case 'TSParenthesizedType':
+      return hasOperations(type.typeAnnotation, types, seen);
+    case 'TSUnionType':
+    case 'TSIntersectionType':
+      return type.types.some((member) => hasOperations(member, types, seen));
+    case 'TSTypeReference':
+      return type.typeName.type === 'Identifier' && local(type.typeName.name);
+    default:
+      return false;
+  }
+}
+
+function collectTypeDeclarations(program: ESTree.Program): TypeDeclarations {
+  const types = new Map<string, LocalType>();
   const imported = new Set<string>();
+  const classes: ESTree.Class[] = [];
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
       for (const specifier of statement.specifiers) imported.add(specifier.local.name);
@@ -55,30 +125,43 @@ function collectTypeDeclarations(program: ESTree.Program): {
     }
     const declaration =
       statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-    if (declaration?.type === 'TSTypeAliasDeclaration') {
-      declarations.set(declaration.id.name, declaration.typeAnnotation);
+    if (
+      declaration?.type === 'TSTypeAliasDeclaration' ||
+      declaration?.type === 'TSInterfaceDeclaration'
+    ) {
+      types.set(declaration.id.name, declaration);
     }
-    if (declaration?.type === 'ClassDeclaration' && declaration.id) {
-      const shape = serviceShapeName(declaration);
-      if (shape !== undefined) declarations.set(shape, { service: declaration.id.name });
-    }
+    if (declaration?.type === 'ClassDeclaration') classes.push(declaration);
   }
-  return { declarations, imported };
+  // A shape declared here counts when it holds operations; an imported one when it follows the
+  // `<Service>Shape` naming, since its declaration is out of sight.
+  const shapes = new Map<string, string>();
+  for (const declaration of classes) {
+    const shape = serviceShapeName(declaration);
+    if (shape === undefined || declaration.id === null) continue;
+    const local = types.get(shape);
+    const holdsOperations =
+      local !== undefined
+        ? hasOperations(local, types, new Set([shape]))
+        : imported.has(shape) && shape.endsWith('Shape');
+    if (holdsOperations) shapes.set(shape, declaration.id.name);
+  }
+  return { types, shapes, imported };
 }
 
 /** The service whose instance (or member) `type` describes, if any. */
 function serviceOfType(
   type: ESTree.TSType,
   declarations: TypeDeclarations,
-  imported: ReadonlySet<string>,
   seen = new Set<string>()
 ): string | undefined {
   switch (type.type) {
     case 'TSParenthesizedType':
-      return serviceOfType(type.typeAnnotation, declarations, imported, seen);
+      return serviceOfType(type.typeAnnotation, declarations, seen);
     case 'TSUnionType':
+    case 'TSIntersectionType':
       for (const member of type.types) {
-        const service = serviceOfType(member, declarations, imported, seen);
+        const service = serviceOfType(member, declarations, seen);
         if (service !== undefined) return service;
       }
       return undefined;
@@ -92,7 +175,7 @@ function serviceOfType(
           return typeQueryText(type.objectType);
         }
       }
-      return serviceOfType(type.objectType, declarations, imported, seen);
+      return serviceOfType(type.objectType, declarations, seen);
     }
     case 'TSTypeReference': {
       const name = typeNameText(type.typeName);
@@ -103,14 +186,20 @@ function serviceOfType(
         const query = typeQueryText(argument)?.replace(/\.make$/u, '');
         return query !== undefined && /^[A-Z]\w*$/u.test(query) ? query : undefined;
       }
+      if (PART_OF.has(name) && argument !== undefined) {
+        return serviceOfType(argument, declarations, seen);
+      }
       if (type.typeName.type !== 'Identifier' || seen.has(name)) return undefined;
-      const declaration = declarations.get(name);
-      if (declaration !== undefined && 'service' in declaration) return declaration.service;
-      if (declaration !== undefined) {
-        return serviceOfType(declaration, declarations, imported, new Set([...seen, name]));
+      const service = declarations.shapes.get(name);
+      if (service !== undefined) return service;
+      const local = declarations.types.get(name);
+      if (local?.type === 'TSTypeAliasDeclaration') {
+        return serviceOfType(local.typeAnnotation, declarations, new Set([...seen, name]));
       }
       // Service shapes declared in another module follow the `<Service>Shape` naming.
-      if (imported.has(name) && name.endsWith('Shape')) return name.slice(0, -'Shape'.length);
+      if (declarations.imported.has(name) && name.endsWith('Shape')) {
+        return name.slice(0, -'Shape'.length);
+      }
       return undefined;
     }
     default:
@@ -166,7 +255,7 @@ export const noServiceParametersRule = defineRule({
     ],
   },
   create(context) {
-    const { declarations, imported } = collectTypeDeclarations(context.sourceCode.ast);
+    const declarations = collectTypeDeclarations(context.sourceCode.ast);
     const baseline = fileBaseline(context);
     const exempt = exemptServices(context.options[0]);
 
@@ -174,7 +263,7 @@ export const noServiceParametersRule = defineRule({
       for (const parameter of node.params) {
         const annotation = functionParameterTypeAnnotation(parameter);
         if (annotation == null) continue;
-        const service = serviceOfType(annotation.typeAnnotation, declarations, imported);
+        const service = serviceOfType(annotation.typeAnnotation, declarations);
         if (service === undefined || exempt.has(service)) continue;
         const name = functionParameterBindingName(parameter, context.sourceCode);
         if (baseline.allows(`${functionName(node)}.${name}`)) continue;

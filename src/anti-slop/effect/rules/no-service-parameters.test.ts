@@ -36,6 +36,18 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
         notifier.send(loan);`,
       options: [{ baseline: ['src/loans/remind.ts#remind.notifier'] }],
     },
+    // A service whose shape is plain data, such as the current user, holds a value, not operations,
+    // so a function may take that data from anyone.
+    `class Person extends Schema.Class<Person>('Person')({ id: Schema.String }) {}
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const isGuest = (person: Person) => person.id === '';`,
+    `interface Person { readonly id: string; readonly name: string }
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const greet = (person: Person) => person.name;`,
+    // An imported shape is a service only by the \`…Shape\` naming.
+    `import type { Person } from './person';
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const isGuest = (person: Person) => person.id === '';`,
   ],
   invalid: [
     {
@@ -76,6 +88,29 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       export class Mailer extends Context.Service<Mailer, MailerShape>()('app/Mailer') {}
       const notify = (mailer: MailerShape, to: string) => mailer.send(to, 'Due soon');`,
       errors: [{ ...error, data: { parameter: 'mailer', service: 'Mailer' } }],
+    },
+    {
+      // The shape may be declared after the class, and an Effect-valued member is an operation.
+      code: `export class Clock extends Context.Service<Clock, ClockShape>()('app/Clock') {}
+      type ClockShape = { readonly now: Effect.Effect<Date> };
+      const stamp = (clock: ClockShape) => clock.now;`,
+      errors: [{ ...error, data: { parameter: 'clock', service: 'Clock' } }],
+    },
+    {
+      code: `interface StoreShape { find(id: string): Effect.Effect<Row> }
+      interface CachedStoreShape extends StoreShape { readonly size: number }
+      export class Store extends Context.Service<Store, CachedStoreShape>()('app/Store') {}
+      const load = (store: CachedStoreShape, id: string) => store.find(id);`,
+      errors: [{ ...error, data: { parameter: 'store', service: 'Store' } }],
+    },
+    {
+      // Part of a service is still the service.
+      code: `import type { MailerShape } from './mailer';
+      const notify = (mailer: Pick<MailerShape, 'send'>, audit: MailerShape & Audited) => mailer.send();`,
+      errors: [
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+        { ...error, data: { parameter: 'audit', service: 'Mailer' } },
+      ],
     },
     {
       ...baselined,
