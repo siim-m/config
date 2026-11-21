@@ -12,6 +12,7 @@ import { noObjectParametersRule } from "./rules/no-object-parameters.ts";
 import { noReflectApplyRule } from "./rules/no-reflect-apply.ts";
 import { noReflectGetRule } from "./rules/no-reflect-get.ts";
 import { noRuntimeTypeofRule } from "./rules/no-runtime-typeof.ts";
+import { noSharedArraySortRule } from "./rules/no-shared-array-sort.ts";
 import { noUnknownParametersRule } from "./rules/no-unknown-parameters.ts";
 import { noUnknownReturnsRule } from "./rules/no-unknown-returns.ts";
 import { noUnknownTypeAliasesRule } from "./rules/no-unknown-type-aliases.ts";
@@ -36,6 +37,7 @@ const antiSlopPlugin = eslintCompatPlugin({
 		"no-reflect-apply": noReflectApplyRule,
 		"no-reflect-get": noReflectGetRule,
 		"no-runtime-typeof": noRuntimeTypeofRule,
+		"no-shared-array-sort": noSharedArraySortRule,
 		"no-unsafe-dictionary-type": noUnsafeDictionaryTypeRule,
 		"no-unknown-parameters": noUnknownParametersRule,
 		"no-unknown-returns": noUnknownReturnsRule,

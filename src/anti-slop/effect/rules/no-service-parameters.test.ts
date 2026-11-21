@@ -36,6 +36,60 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
         notifier.send(loan);`,
       options: [{ baseline: ['src/loans/remind.ts#remind.notifier'] }],
     },
+    // A service whose shape is plain data, such as the current user, holds a value, not operations,
+    // so a function may take that data from anyone.
+    `class Person extends Schema.Class<Person>('Person')({ id: Schema.String }) {}
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const isGuest = (person: Person) => person.id === '';`,
+    `interface Person { readonly id: string; readonly name: string }
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const greet = (person: Person) => person.name;`,
+    // An imported shape is a service only by the \`…Shape\` naming.
+    `import type { Person } from './person';
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const isGuest = (person: Person) => person.id === '';`,
+    // A data-only service's instance is that data too.
+    `class Person extends Schema.Class<Person>('Person')({ id: Schema.String }) {}
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const audit = (person: CurrentPerson['Service']) => person.id;`,
+    `class CurrentUser extends Context.Service<CurrentUser, { readonly id: string }>()('CurrentUser') {}
+    const audit = (user: CurrentUser['Service']) => user.id;`,
+    // A schema's `Type` is data, as in a union of two Schema.Struct types.
+    `const User = Schema.Struct({ id: Schema.String, email: Schema.String });
+    type User = typeof User.Type;
+    const Guest = Schema.Struct({ id: Schema.String, email: Schema.Null });
+    type Guest = Schema.Schema.Type<typeof Guest>;
+    type Person = User | Guest;
+    class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
+    const isGuest = (person: Person) => person.email === null;
+    const audit = (person: CurrentPerson['Service']) => person.id;`,
+    // A data class's own helpers compute over its fields; they aren't operations.
+    `class Account extends Schema.Class<Account>('Account')({ role: Schema.String }) {
+      isAdmin() { return this.role === 'admin'; }
+    }
+    class CurrentAccount extends Context.Service<CurrentAccount, Account>()('CurrentAccount') {}
+    const canEdit = (account: Account) => account.isAdmin();`,
+    // Picking part of a service, as a narrow dependency or a test's overrides, is left alone.
+    `import type { MailerShape } from './mailer';
+    const notify = (mailer: Pick<MailerShape, 'send'>, overrides: Partial<MailerShape>) => mailer.send();`,
+    // Schemas behind `satisfies`, in an imported namespace, or extended the Effect 3 way.
+    `import * as Models from './models';
+    const User = Schema.Struct({ id: Schema.String }) satisfies Schema.Schema<{ readonly id: string }>;
+    type User = typeof User.Type;
+    type Member = typeof Models.Member.Type;
+    const Person = Schema.Struct({ id: Schema.String });
+    interface Person extends Schema.Schema.Type<typeof Person> {}
+    class CurrentUser extends Context.Service<CurrentUser, User>()('CurrentUser') {}
+    class CurrentMember extends Context.Service<CurrentMember, Member>()('CurrentMember') {}
+    class CurrentPerson extends Context.Tag('CurrentPerson')<CurrentPerson, Person>() {}
+    const audit = (user: User, member: Member, person: Person) => user.id;`,
+    // A generic shape names no type of its own.
+    `class Settings extends Context.Service<Settings, Record<string, string>>()('Settings') {}
+    const tally = (counts: Record<string, number>) => counts;`,
+    // Only an Effect service factory names a service's shape.
+    `interface Props { onSave(): void }
+    class Form extends component<Form, Props>() {}
+    const render = (props: Props) => props.onSave();`,
   ],
   invalid: [
     {
@@ -76,6 +130,145 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       export class Mailer extends Context.Service<Mailer, MailerShape>()('app/Mailer') {}
       const notify = (mailer: MailerShape, to: string) => mailer.send(to, 'Due soon');`,
       errors: [{ ...error, data: { parameter: 'mailer', service: 'Mailer' } }],
+    },
+    {
+      // The shape may be declared after the class, and an Effect-valued member is an operation.
+      code: `export class Clock extends Context.Service<Clock, ClockShape>()('app/Clock') {}
+      type ClockShape = { readonly now: Effect.Effect<Date> };
+      const stamp = (clock: ClockShape) => clock.now;`,
+      errors: [{ ...error, data: { parameter: 'clock', service: 'Clock' } }],
+    },
+    {
+      code: `interface StoreShape { find(id: string): Effect.Effect<Row> }
+      interface CachedStoreShape extends StoreShape { readonly size: number }
+      export class Store extends Context.Service<Store, CachedStoreShape>()('app/Store') {}
+      const load = (store: CachedStoreShape, id: string) => store.find(id);`,
+      errors: [{ ...error, data: { parameter: 'store', service: 'Store' } }],
+    },
+    {
+      // A shape whose members the rule can't see stays a service.
+      code: `const make = Effect.gen(function* () { return { send: (to: string) => Effect.void } });
+      type MailerShape = Effect.Success<typeof make>;
+      export class Mailer extends Context.Service<Mailer, MailerShape>()('app/Mailer') {}
+      const notify = (mailer: MailerShape) => mailer.send('a');`,
+      errors: [{ ...error, data: { parameter: 'mailer', service: 'Mailer' } }],
+    },
+    {
+      // Operations behind a local alias or in a nested object.
+      code: `type Send = (to: string) => Effect.Effect<void>;
+      interface SmsShape { readonly send: Send }
+      interface RepoShape { readonly users: { readonly find: (id: string) => Effect.Effect<User> } }
+      export class Sms extends Context.Service<Sms, SmsShape>()('app/Sms') {}
+      export class Repo extends Context.Service<Repo, RepoShape>()('app/Repo') {}
+      const text = (sms: SmsShape, repo: RepoShape) => sms.send('a');`,
+      errors: [
+        { ...error, data: { parameter: 'sms', service: 'Sms' } },
+        { ...error, data: { parameter: 'repo', service: 'Repo' } },
+      ],
+    },
+    {
+      // Effect 3's Context.Tag, and a default-exported service.
+      code: `interface CacheOps { get(key: string): Effect.Effect<string> }
+      interface MailOps { send(): Effect.Effect<void> }
+      class Cache extends Context.Tag('app/Cache')<Cache, CacheOps>() {}
+      export default class Mailer extends Context.Service<Mailer, MailOps>()('app/Mailer') {}
+      const read = (cache: CacheOps, mail: MailOps) => cache.get('a');`,
+      errors: [
+        { ...error, data: { parameter: 'cache', service: 'Cache' } },
+        { ...error, data: { parameter: 'mail', service: 'Mailer' } },
+      ],
+    },
+    {
+      // An imported shape is a service's instance; only the bare imported name may be data.
+      code: `import type { MailerApi } from './api';
+      class Mailer extends Context.Service<Mailer, MailerApi>()('app/Mailer') {}
+      const a = (mailer: Mailer['Service']) => mailer;
+      const b = (mailer: Context.Service.Shape<typeof Mailer>) => mailer;`,
+      errors: [
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+      ],
+    },
+    {
+      // Operations behind an index signature, a state handle, or a data class's method.
+      code: `interface HooksShape { readonly [name: string]: () => Effect.Effect<void> }
+      interface CounterShape { readonly count: Ref.Ref<number> }
+      class Account extends Schema.Class<Account>('Account')({ id: Schema.String }) {
+        send() { return Effect.log(this.id); }
+      }
+      class Outbox extends Schema.Class<Outbox>('Outbox')({ id: Schema.String }) {
+        readonly flush = () => Effect.void;
+      }
+      class CurrentOutbox extends Context.Service<CurrentOutbox, Outbox>()('app/CurrentOutbox') {}
+      class Ledger extends Schema.Class<Ledger>('Ledger')({ id: Schema.String }) {
+        send(ok: boolean) {
+          if (ok) {
+            return this.id === '' ? null : Effect.log(this.id);
+          }
+          return null;
+        }
+      }
+      class Journal extends Schema.Class<Journal>('Journal')({ id: Schema.String }) {
+        get flush(): Effect.Effect<void> { return pending(); }
+      }
+      class Tape extends Schema.Class<Tape>('Tape')({ id: Schema.String }) {
+        readonly run: () => Effect.Effect<void> = logIt;
+      }
+      class CurrentLedger extends Context.Service<CurrentLedger, Ledger>()('app/CurrentLedger') {}
+      class CurrentJournal extends Context.Service<CurrentJournal, Journal>()('app/CurrentJournal') {}
+      class CurrentTape extends Context.Service<CurrentTape, Tape>()('app/CurrentTape') {}
+      class Hooks extends Context.Service<Hooks, HooksShape>()('app/Hooks') {}
+      class Counter extends Context.Service<Counter, CounterShape>()('app/Counter') {}
+      class CurrentAccount extends Context.Service<CurrentAccount, Account>()('app/CurrentAccount') {}
+      const run = (
+        hooks: HooksShape,
+        counter: CounterShape,
+        account: Account,
+        outbox: Outbox,
+        ledger: Ledger,
+        journal: Journal,
+        tape: Tape
+      ) => account.send();`,
+      errors: [
+        { ...error, data: { parameter: 'hooks', service: 'Hooks' } },
+        { ...error, data: { parameter: 'counter', service: 'Counter' } },
+        { ...error, data: { parameter: 'account', service: 'CurrentAccount' } },
+        { ...error, data: { parameter: 'outbox', service: 'CurrentOutbox' } },
+        { ...error, data: { parameter: 'ledger', service: 'CurrentLedger' } },
+        { ...error, data: { parameter: 'journal', service: 'CurrentJournal' } },
+        { ...error, data: { parameter: 'tape', service: 'CurrentTape' } },
+      ],
+    },
+    {
+      // A generic local shape, a `.Type` of something that isn't a schema, and a local `…Shape`
+      // built on an import are all still services.
+      code: `import type { BaseApi } from './base';
+      interface MailerApi<A> { send(to: A): Effect.Effect<void> }
+      class Mailer extends Context.Service<Mailer, MailerApi<string>>()('app/Mailer') {}
+      const live = makeLive();
+      type LiveApi = typeof live.Type;
+      class Live extends Context.Service<Live, LiveApi>()('app/Live') {}
+      interface StoreShape extends BaseApi {}
+      class Store extends Context.Service<Store, StoreShape>()('app/Store') {}
+      const run = (mailer: MailerApi<string>, api: LiveApi, store: StoreShape) => mailer.send('a');`,
+      errors: [
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+        { ...error, data: { parameter: 'api', service: 'Live' } },
+        { ...error, data: { parameter: 'store', service: 'Store' } },
+      ],
+    },
+    {
+      // An exempt service doesn't hide another one beside it.
+      code: `import type { AllowedShape, MailerShape } from './services';
+      const notify = (both: AllowedShape & MailerShape) => both.send();`,
+      options: [{ exempt: ['Allowed'] }],
+      errors: [{ ...error, data: { parameter: 'both', service: 'Mailer' } }],
+    },
+    {
+      // A service joined with another type is still the service.
+      code: `import type { MailerShape } from './mailer';
+      const notify = (audit: MailerShape & Audited) => audit.send();`,
+      errors: [{ ...error, data: { parameter: 'audit', service: 'Mailer' } }],
     },
     {
       ...baselined,

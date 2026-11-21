@@ -30,6 +30,7 @@ const preset = {
     'anti-slop/no-reflect-apply': 'error',
     'anti-slop/no-reflect-get': 'error',
     'anti-slop/no-runtime-typeof': 'error',
+    'anti-slop/no-shared-array-sort': 'error',
     'anti-slop/no-unknown-parameters': 'error',
     'anti-slop/no-unknown-returns': 'error',
     'anti-slop/no-unknown-type-aliases': 'error',
@@ -40,14 +41,13 @@ const preset = {
     'anti-slop/require-safety-comment-for-type-assertion': 'error',
     'anti-slop/require-suppression-reason': 'error',
     'anti-slop-effect/no-manual-effect-error-tag': 'error',
-    'anti-slop-effect/no-ordie-in-service-construction': 'error',
+    'anti-slop-effect/no-ordie': 'error',
     'anti-slop-effect/no-service-constructor-imports': 'error',
     'anti-slop-effect/no-service-parameters': 'error',
     'anti-slop-effect/no-unbounded-retry': 'error',
     'anti-slop-effect/prefer-effect-match': 'error',
     'anti-slop-effect/require-cause-when-narrowing': 'error',
     'anti-slop-effect/throw-in-effect-gen': 'error',
-    'ai-guard/no-assertionless-test': 'error',
     'ai-guard/no-placeholder-implementation': 'error',
     'ai-guard/no-silent-fallback': 'error',
     'ai-guard/no-tautological-assertion': 'error',
@@ -85,8 +85,9 @@ const preset = {
     {
       files: TEST_FILES,
       rules: {
-        // A test may throw inside Effect.gen to fail on purpose.
+        // A test may throw inside Effect.gen to fail on purpose, or die on a broken fixture.
         'anti-slop-effect/throw-in-effect-gen': 'off',
+        'anti-slop-effect/no-ordie': 'off',
       },
     },
   ],

@@ -11,7 +11,10 @@ const DIRECTIVE =
   /^(?:(?:oxlint|eslint)-(?:disable|enable|env)\b|eslint\s+[\w@/-]+\s*:\s*(?:off|warn|error|[012]|\[)|@ts-(?:expect-error|ignore|nocheck|check)\b|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
-const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
+const SUPPRESSION =
+  /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics(?:-next-line)?\s.*:(?:off|skip-file)(?![\w-])|svelte-ignore\b)/iu;
+/** A one-word block comment before a template literal, such as `glsl`, that tells editors how to highlight it. */
+const LANGUAGE_HINT = /^\s*[a-z][\w-]*\s*$/iu;
 const isDoc = (comment: Comment): boolean =>
   comment.type === 'Block' && comment.value.startsWith('*');
 
@@ -55,9 +58,16 @@ function commentGroups(
   return groups;
 }
 
-/** The doc comment directly above a node, looking past directives such as `oxlint-disable-next-line`. */
+/**
+ * The doc comment directly above a node, looking past directives such as `oxlint-disable-next-line`
+ * and, for a union variant, past the `|` in front of it.
+ */
 function docBefore(node: ESTree.Node, sourceCode: SourceCode): Comment | undefined {
-  const comments = sourceCode.getCommentsBefore(node);
+  let comments = sourceCode.getCommentsBefore(node);
+  const token = sourceCode.getTokenBefore(node);
+  if (comments.length === 0 && node.parent?.type === 'TSUnionType' && token?.value === '|') {
+    comments = sourceCode.getCommentsBefore(token);
+  }
   let comment = comments.pop();
   while (comment !== undefined && !isDoc(comment) && textLines(comment).length === 0)
     comment = comments.pop();
@@ -109,6 +119,41 @@ function exportedStatements(
     }
   }
   return exported;
+}
+
+/**
+ * In a Svelte component, the type its `$props()` call declares, inline or as a local interface or
+ * type alias: the component's API, whose member docs editors show to callers.
+ */
+function svelteProps(program: ESTree.Program, filename: string): readonly ESTree.Node[] {
+  if (!filename.endsWith('.svelte')) return [];
+  const types = new Map<string, ESTree.Node>();
+  for (const statement of program.body) {
+    if (statement.type === 'TSInterfaceDeclaration' || statement.type === 'TSTypeAliasDeclaration')
+      types.set(statement.id.name, statement);
+  }
+  const props: ESTree.Node[] = [];
+  /** A literal or local type, or each part of an intersection such as `Props & HTMLButtonAttributes`. */
+  const addProps = (type: ESTree.TSType): void => {
+    if (type.type === 'TSTypeLiteral') props.push(type);
+    if (type.type === 'TSIntersectionType') type.types.forEach(addProps);
+    if (type.type === 'TSTypeReference' && type.typeName.type === 'Identifier') {
+      const declaration = types.get(type.typeName.name);
+      if (declaration !== undefined) props.push(declaration);
+    }
+  };
+  for (const statement of program.body) {
+    if (statement.type !== 'VariableDeclaration') continue;
+    for (const { id, init } of statement.declarations) {
+      const callsProps =
+        init?.type === 'CallExpression' &&
+        init.callee.type === 'Identifier' &&
+        init.callee.name === '$props';
+      const annotation = id.typeAnnotation?.typeAnnotation;
+      if (callsProps && annotation !== undefined) addProps(annotation);
+    }
+  }
+  return props;
 }
 
 /** The statement a doc comment for an exported node sits above. */
@@ -212,6 +257,7 @@ export const commentsRule = defineRule({
       );
     const prefixes = options.allow.map((prefix) => `\`${prefix}:\``).join(', ');
     const members: ESTree.Node[] = [];
+    const templates = new Set<number>();
     const collect = (node: ESTree.Node) => {
       members.push(node);
     };
@@ -241,6 +287,12 @@ export const commentsRule = defineRule({
       PropertyDefinition: collect,
       MethodDefinition: collect,
       Property: collect,
+      TemplateLiteral(node) {
+        if (node.parent?.type !== 'TaggedTemplateExpression') templates.add(node.start);
+      },
+      TSUnionType(node) {
+        members.push(...node.types);
+      },
       'Program:exit'(program) {
         const exportedNodes = exportedStatements(program, sourceCode);
         /** Where each export doc starts. */
@@ -250,7 +302,8 @@ export const commentsRule = defineRule({
           if (doc !== undefined) exportDocs.add(doc.start);
         };
         for (const node of exportedNodes) addDoc(docTarget(node));
-        for (const member of members) if (isExposedMember(member, exportedNodes)) addDoc(member);
+        const exposed = new Set([...exportedNodes, ...svelteProps(program, context.filename)]);
+        for (const member of members) if (isExposedMember(member, exposed)) addDoc(member);
         const codeStart = program.body[0]?.start ?? sourceCode.text.length;
 
         const groups = commentGroups(sourceCode.getAllComments(), sourceCode.text);
@@ -268,6 +321,13 @@ export const commentsRule = defineRule({
             (last.end <= codeStart && group.some((comment) => COPYRIGHT.test(comment.value)));
           const lines = group.flatMap(textLines);
           if (licence || lines.length === 0) continue;
+          const languageHint =
+            group.length === 1 &&
+            first.type === 'Block' &&
+            !isDoc(first) &&
+            LANGUAGE_HINT.test(first.value) &&
+            templates.has(sourceCode.getTokenAfter(first, { includeComments: true })?.start ?? -1);
+          if (languageHint) continue;
           const kind = exportDocs.has(first.start)
             ? 'exportDoc'
             : ownLine(first) && suppressionFollows(groups, index, ownLine)

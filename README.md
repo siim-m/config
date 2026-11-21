@@ -46,6 +46,15 @@ prefix. Each gets one line of at most 30 words (`maxWords`). The prefixes defaul
 `SYNC` and `WARNING`. An `allow` list replaces them, so keep `SAFETY` and `SYNC` in it: the
 type-assertion and React effect rules ask for those.
 
+A doc on part of an export's API counts as an export doc: a member of an exported type or class, a
+variant of an exported union, and in a `.svelte` file a member of the props type that `$props()`
+names. oxlint reads each `<script>` block on its own, so declare that type in the same block as
+`$props()`, or export it from `<script module>`. Document the component itself in a
+`<!-- @component -->` comment in the markup, which oxlint doesn't read. A suppression is an
+`oxlint-disable` or `eslint-disable` comment, a `@ts-` directive, an `@effect-diagnostics` directive
+that turns a check `off` or `skip-file`, or `svelte-ignore`. A one-word language hint for editors
+before a template literal, such as `/* glsl */`, stays too.
+
 A file whose exports need longer docs, such as a library's public API, turns on
 `multilineExportDocs` in an override. The override replaces the rule's options, so repeat any others
 you set:
@@ -56,17 +65,40 @@ overrides: [
 ],
 ```
 
+## Effect
+
+`anti-slop-effect/no-ordie` reports `Effect.orDie`, `Stream.orDie`, `Layer.orDie` and a `catch`
+whose handler only dies. Each one turns every error in the channel into a defect, including errors
+added to it later, and the types don't show it. Die only on the errors you mean, with
+`Effect.catchTag('ConfigMissing', Effect.die)` or `catchTags`, so a new error stays in the error
+type. The preset turns the rule off in test files, where a broken fixture may stop the run, and the
+tsconfig turns off the language service's `catchDieToOrDie`, which would ask for `orDie` in place of
+such a catch. The rule replaces `no-ordie-in-service-construction` from 0.5.0; oxlint won't load a
+config that still names the old rule, so rename or remove it there.
+
+`anti-slop-effect/no-service-parameters` reports a function parameter typed as a service, such as
+`(mailer: MailerShape, to: string) => mailer.send(to)`. Get the service from context where the
+caller is built instead. A function may still take a service's shape when the file shows it's plain
+data, such as a signed-in user built from `Schema.Struct` or `Schema.Class`. An interface or object
+type is data when none of its members is typed as a function, an Effect, a Stream or a Ref. A
+`Schema.Class` or `Data.Class` is data when none of its methods, getters or fields returns, holds or
+is typed as one of those, so it may keep helpers such as `isAdmin()`. A shape the rule can't see
+into, such as `Effect.Success<typeof make>`, stays a service, and a parameter typed by an imported
+name counts only when the name ends in `Shape`. List services that callers may pass along anyway,
+such as request context, in `exempt`.
+
 ## Tests and shortcuts
 
-Ten rules from two npm packages report tests that pass whatever the code does or lean on time, and
+Nine rules from two npm packages report tests that pass whatever the code does or lean on time, and
 other shortcuts agents take:
 
 - From [eslint-plugin-ai-guard](https://github.com/ai-guard-dev/eslint-plugin-ai-guard):
-  `no-assertionless-test`, `no-tautological-assertion`, `no-placeholder-implementation`,
-  `no-test-env-branch`, `no-silent-fallback` and `no-undeclared-import`. Its test detection doesn't
-  know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and typescript-eslint,
-  which ask for TypeScript 6 as a peer; npm nests a copy under this package when the project has
-  TypeScript 7.
+  `no-tautological-assertion`, `no-placeholder-implementation`, `no-test-env-branch`,
+  `no-silent-fallback` and `no-undeclared-import`. Its `no-assertionless-test` stays off: it can't
+  see an assertion helper imported from another file, so it reports tests that do assert. Its test
+  detection doesn't know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and
+  typescript-eslint, which ask for TypeScript 6 as a peer; npm nests a copy under this package when
+  the project has TypeScript 7.
 - From [landmines](https://github.com/interfere-inc/landmines): `no-fixed-sleep`,
   `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. All four take an
   `allow: { "<file>": <count> }` option for adopting them file by file.
@@ -97,12 +129,28 @@ three rules of its own:
 In `.tsx` files a number can't be a condition, because `{count && <p />}` renders `0`. Write
 `count > 0`.
 
+## Oxlint's `suspicious` category
+
+The preset doesn't turn this category on. A project that does will see these rules misfire on
+deliberate code:
+
+- `unicorn/consistent-function-scoping` reports helpers inside a Playwright `page.evaluate`
+  callback. The browser runs the callback from its source, so a hoisted helper isn't there. Suppress
+  these inline with a reason.
+- `unicorn/no-array-sort` and `unicorn/no-array-reverse` can't tell an array that `map`, `filter` or
+  `Object.keys` just made from one the code doesn't own, and ask for `toSorted` and `toReversed`,
+  which need ES2023. Turn both off: the preset's `anti-slop/no-shared-array-sort` reports `sort()`
+  and `reverse()` only on an array the code didn't just make, such as a parameter, a property, a
+  module constant or a function's result, and skips Effect's `Array.sort`, which returns a copy.
+- `eslint/no-useless-constructor` reports `constructor() { super(); }`, which narrows a subclass's
+  constructor, such as a `Map` subclass that takes no entries.
+
 ## License
 
 MIT. The anti-slop rules are MIT, copyright Dillon Mulroy; `require-readable-spacing` uses MIT code
 from ESLint Stylistic. The `anti-slop-react` rules are MIT, copyright T3 Tools Inc.: rewritten from
 T3 Code's `oxlint-plugin-t3code` at `2de3370`, and not kept in step with it. `anti-slop/comments`
-and `anti-slop/require-suppression-reason` adapt code from the same plugin. Four `anti-slop-effect`
+and `anti-slop/require-suppression-reason` adapt code from the same plugin. Three `anti-slop-effect`
 rules and `no-disabled-type-assertion-rules` are MIT, from Kyle Mistele's fork of anti-slop;
 `throw-in-effect-gen` there is ported from enfect, MIT, copyright Marc Suesser, and
 `no-unbounded-retry` from cevr/effect-oxlint, MIT. eslint-plugin-ai-guard and @interfere/landmines
