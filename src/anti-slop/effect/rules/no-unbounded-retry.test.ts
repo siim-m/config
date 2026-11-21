@@ -168,6 +168,11 @@ tester.run("anti-slop-effect/no-unbounded-retry", noUnboundedRetryRule, {
 			const answer = ask(prompt).pipe(Effect.retry(Schedule.max([Schedule.spaced("1 second"), Schedule.exponential("1 second")])));`,
 			errors: unbounded,
 		},
+		{
+			code: `${imports}
+			const answer = ask(prompt).pipe(Effect.retry(Schedule.concatResult(Schedule.recurs(3), Schedule.spaced("1 second"))));`,
+			errors: unbounded,
+		},
 		// An absent limit is no limit.
 		{
 			code: `${imports}

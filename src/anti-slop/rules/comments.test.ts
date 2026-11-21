@@ -107,6 +107,11 @@ tester.run('anti-slop/comments', commentsRule, {
       code: '// See https://example.com/2026-11-20/notes for why.\nconst a = 1;',
       options: forbidden,
     },
+    // The reason above a line that ends in a disable explains it.
+    {
+      code: '// The CLI prints its result.\nconsole.log(1); // oxlint-disable-line no-console',
+      options: taggedOnly,
+    },
     // A markdown heading in a doc comment is not a divider.
     '/**\n * Loads a row.\n *\n * ### Example\n * load(1)\n */\nfunction load(id: number) { return id; }',
     '/**\n * Loads a row.\n *\n * ### `load(1)`\n */\nfunction load(id: number) { return id; }',
@@ -243,6 +248,16 @@ tester.run('anti-slop/comments', commentsRule, {
       options: [{ maxWords: 5 }],
       errors: [{ messageId: 'tooLong' }],
     },
+    // Prose about eslint config is not a directive.
+    {
+      code: '// eslint config: the base preset sets these.\nconst a = 1;',
+      options: [{ maxWords: 4 }],
+      errors: [{ messageId: 'tooLong' }],
+    },
+    // TODO next to a hyphen is still a task marker.
+    { code: '// TODO-remove this\nconst a = 1;', errors: [{ messageId: 'untrackedTask' }] },
+    // A heading is exempt only in a doc comment.
+    { code: '/* ### Helpers ### */\nconst a = 1;', errors: [{ messageId: 'divider' }] },
     // Enum members are names too (S13).
     {
       code: "enum State {\n  /** Ready. */\n  Ready = 'ready',\n}",

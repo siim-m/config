@@ -65,7 +65,8 @@ other shortcuts agents take:
   `no-assertionless-test`, `no-tautological-assertion`, `no-placeholder-implementation`,
   `no-test-env-branch`, `no-silent-fallback` and `no-undeclared-import`. Its test detection doesn't
   know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and typescript-eslint,
-  which install TypeScript 6 as a peer, nested under this package when the project has TypeScript 7.
+  which ask for TypeScript 6 as a peer; npm nests a copy under this package when the project has
+  TypeScript 7.
 - From [landmines](https://github.com/interfere-inc/landmines): `no-fixed-sleep`,
   `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. All four take an
   `allow: { "<file>": <count> }` option for adopting them file by file.

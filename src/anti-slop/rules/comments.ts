@@ -15,7 +15,7 @@ interface Options {
 }
 
 const DIRECTIVE =
-  /^(?:(?:oxlint|eslint)-(?:disable|enable|env)\b|eslint\s+[\w@/-]+\s*:|@ts-(?:expect-error|ignore|nocheck|check)\b|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
+  /^(?:(?:oxlint|eslint)-(?:disable|enable|env)\b|eslint\s+[\w@/-]+\s*:\s*(?:off|warn|error|[012]|\[)|@ts-(?:expect-error|ignore|nocheck|check)\b|@effect-diagnostics|(?:prettier|oxfmt)-ignore|biome-ignore|svelte-ignore|(?:c8|v8|istanbul)\s+ignore|@(?:vitest|jest)-environment|@vite-ignore|webpack[A-Z]\w*:|@jsx|[@#]__(?:PURE|NO_SIDE_EFFECTS|INLINE|NOINLINE)__|\/\s*<(?:reference|amd-module|amd-dependency)\s|#\s*source(?:Mapping)?URL=|#(?:end)?region\b|nosemgrep\b)/u;
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
 const SUPPRESSION = /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck))/u;
@@ -24,7 +24,7 @@ const CODE_SPAN = /`[^`]*`/gu;
 const ISSUE = /(?<![\w&/])#\d+\b(?![a-f])/giu;
 const DIVIDER = /^(?:[-=*#~_/+\u2500-\u257F]{3,}(?:\s.*)?|.*[-=*#~_\u2500-\u257F]{3,})$/u;
 const STEP_LABEL = /^(?:arrange|act|assert|given|when|then)\s*[:.]?$/iu;
-const TASK_MARKER = /(?<!-)\b(?:TODO|FIXME|XXX|HACK)\b(?!-)/u;
+const TASK_MARKER = /\b(?:TODO|FIXME|HACK)\b|(?<!-)\bXXX\b(?!-)/u;
 /** A markdown heading, which a doc comment may use: `### Example`. */
 const HEADING = /^#{1,6}\s+\S/u;
 const TASK_LINK = /#\d+|\b[A-Z][A-Z\d]*-\d+\b|https?:\/\//u;
@@ -166,9 +166,9 @@ function suppressionFollows(
   let line = groups[index]?.at(-1)?.loc.end.line ?? 0;
   for (let next = index + 1; next < groups.length; next++) {
     const comment = groups[next]?.[0];
-    if (comment === undefined || comment.loc.start.line !== line + 1 || !ownLine(comment)) {
-      return false;
-    }
+    if (comment === undefined || comment.loc.start.line !== line + 1) return false;
+    // A reason may sit above a line that ends in `// oxlint-disable-line rule`.
+    if (!ownLine(comment)) return SUPPRESSION.test(comment.value);
     if (SUPPRESSION.test(comment.value)) return true;
     if (!isDirective(comment) && comment.value.replace(/[\s*]/gu, '') !== '') return false;
     line = comment.loc.end.line;
@@ -332,7 +332,8 @@ export const commentsRule = defineRule({
       ) {
         return ['untagged', { prefixes }];
       }
-      if (lines.some((line) => DIVIDER.test(line) && (isLine || !HEADING.test(line))))
+      const isDoc = group[0]?.type === 'Block' && group[0].value.startsWith('*');
+      if (lines.some((line) => DIVIDER.test(line) && !(isDoc && HEADING.test(line))))
         return ['divider'];
       if (isLine && lines.length === 1 && STEP_LABEL.test(body)) return ['stepLabel'];
       if (isLine && lines.every((line) => COMMENTED_CODE.test(line))) return ['commentedOutCode'];

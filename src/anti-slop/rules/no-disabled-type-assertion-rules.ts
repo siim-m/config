@@ -23,8 +23,9 @@ function directiveRules(value: string): readonly string[] | null {
   if (match === null) return null;
   // Oxlint ends the rule list at ` --`, with or without a space before the reason.
   const list = (match[1] ?? "").split(/\s--/u)[0] ?? "";
+  // Commas, spaces and newlines all separate rule names.
   return list
-    .split(",")
+    .split(/[\s,]+/u)
     .map(normalizeRuleName)
     .filter((rule) => rule.length > 0);
 }

@@ -30,7 +30,7 @@ const boundedConstructors: ReadonlySet<string> = new Set(["duration", "during", 
 const intersections: ReadonlySet<string> = new Set(["max"]);
 
 /** Combinators that keep recurring while any schedule recurs, so every schedule must be bounded. */
-const unions: ReadonlySet<string> = new Set(["concat", "min"]);
+const unions: ReadonlySet<string> = new Set(["concat", "concatResult", "min"]);
 
 /** Combinators that change a schedule's delays or outputs but not when it stops. Others may stop it, so they read as unknown. */
 const keepers: ReadonlySet<string> = new Set([

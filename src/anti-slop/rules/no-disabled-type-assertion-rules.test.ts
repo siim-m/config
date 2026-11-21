@@ -47,6 +47,15 @@ tester.run("anti-slop/no-disabled-type-assertion-rules", noDisabledTypeAssertion
       code: "// oxlint-disable-next-line typescript/no-unsafe-type-assertion --reason\nconst id = value as UserId;",
       errors: [{ ...disabledRule, data: { rule: "typescript/no-unsafe-type-assertion" } }],
     },
+    // Spaces and newlines separate rule names too.
+    {
+      code: "// oxlint-disable-next-line typescript/no-unsafe-type-assertion eqeqeq -- reason\nconst id = value as UserId;",
+      errors: [{ ...disabledRule, data: { rule: "typescript/no-unsafe-type-assertion" } }],
+    },
+    {
+      code: "/* oxlint-disable\n   typescript/no-unsafe-type-assertion\n   eqeqeq */\nconst id = value as UserId;",
+      errors: [{ ...disabledRule, data: { rule: "typescript/no-unsafe-type-assertion" } }],
+    },
     // Any prefix reaches a built-in rule.
     {
       code: "// oxlint-disable-next-line ts/no-unsafe-type-assertion, foo/consistent-type-assertions -- reason\nconst id = value as UserId;",

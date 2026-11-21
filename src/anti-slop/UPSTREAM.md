@@ -33,13 +33,14 @@ Copied, with their tests, from [K-Mistele/anti-slop](https://github.com/K-Mistel
 
 - `rules/no-disabled-type-assertion-rules.ts`. Changed: a built-in rule named under any prefix
   or none, such as `ts/no-unsafe-type-assertion`, counts, since oxlint matches built-in rules by
-  name; and the rule list ends at ` --` even with no space before the reason.
+  name; the rule list ends at ` --` even with no space before the reason; and spaces or newlines
+  separate rule names as commas do.
 - `effect/rules/no-ordie-in-service-construction.ts`
 - `effect/rules/no-unbounded-retry.ts`, ported there from cevr/effect-oxlint (MIT, which ships no
   copyright notice). Changed: reads Effect 4's array form `Schedule.max([a, b])` and
   `Schedule.min([a, b])`; reads a schedule defined in terms of itself, or passed through a
-  combinator it doesn't know such as `Schedule.while`, as unknown; and treats `times: undefined` as
-  no limit.
+  combinator it doesn't know such as `Schedule.while`, as unknown; treats `times: undefined` as no
+  limit; and reads `Schedule.concatResult` like `concat`.
 - `effect/rules/require-cause-when-narrowing.ts`. Changed: a data-first source built with
   `.pipe(Effect.tapError(...))` counts as logged.
 - `effect/rules/throw-in-effect-gen.ts`, ported there from mpsuesser/enfect (MIT, notice in
