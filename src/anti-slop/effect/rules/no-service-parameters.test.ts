@@ -72,6 +72,17 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
     // Picking part of a service, as a narrow dependency or a test's overrides, is left alone.
     `import type { MailerShape } from './mailer';
     const notify = (mailer: Pick<MailerShape, 'send'>, overrides: Partial<MailerShape>) => mailer.send();`,
+    // Schemas behind `satisfies`, in an imported namespace, or extended the Effect 3 way.
+    `import * as Models from './models';
+    const User = Schema.Struct({ id: Schema.String }) satisfies Schema.Schema<{ readonly id: string }>;
+    type User = typeof User.Type;
+    type Member = typeof Models.Member.Type;
+    const Person = Schema.Struct({ id: Schema.String });
+    interface Person extends Schema.Schema.Type<typeof Person> {}
+    class CurrentUser extends Context.Service<CurrentUser, User>()('CurrentUser') {}
+    class CurrentMember extends Context.Service<CurrentMember, Member>()('CurrentMember') {}
+    class CurrentPerson extends Context.Tag('CurrentPerson')<CurrentPerson, Person>() {}
+    const audit = (user: User, member: Member, person: Person) => user.id;`,
     // A generic shape names no type of its own.
     `class Settings extends Context.Service<Settings, Record<string, string>>()('Settings') {}
     const tally = (counts: Record<string, number>) => counts;`,
@@ -189,16 +200,43 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
         readonly flush = () => Effect.void;
       }
       class CurrentOutbox extends Context.Service<CurrentOutbox, Outbox>()('app/CurrentOutbox') {}
+      class Ledger extends Schema.Class<Ledger>('Ledger')({ id: Schema.String }) {
+        send(ok: boolean) {
+          if (ok) {
+            return ok ? Effect.log(this.id) : Effect.never;
+          }
+          return null;
+        }
+      }
+      class Journal extends Schema.Class<Journal>('Journal')({ id: Schema.String }) {
+        get flush(): Effect.Effect<void> { return pending(); }
+      }
+      class Tape extends Schema.Class<Tape>('Tape')({ id: Schema.String }) {
+        readonly run: () => Effect.Effect<void> = logIt;
+      }
+      class CurrentLedger extends Context.Service<CurrentLedger, Ledger>()('app/CurrentLedger') {}
+      class CurrentJournal extends Context.Service<CurrentJournal, Journal>()('app/CurrentJournal') {}
+      class CurrentTape extends Context.Service<CurrentTape, Tape>()('app/CurrentTape') {}
       class Hooks extends Context.Service<Hooks, HooksShape>()('app/Hooks') {}
       class Counter extends Context.Service<Counter, CounterShape>()('app/Counter') {}
       class CurrentAccount extends Context.Service<CurrentAccount, Account>()('app/CurrentAccount') {}
-      const run = (hooks: HooksShape, counter: CounterShape, account: Account, outbox: Outbox) =>
-        account.send();`,
+      const run = (
+        hooks: HooksShape,
+        counter: CounterShape,
+        account: Account,
+        outbox: Outbox,
+        ledger: Ledger,
+        journal: Journal,
+        tape: Tape
+      ) => account.send();`,
       errors: [
         { ...error, data: { parameter: 'hooks', service: 'Hooks' } },
         { ...error, data: { parameter: 'counter', service: 'Counter' } },
         { ...error, data: { parameter: 'account', service: 'CurrentAccount' } },
         { ...error, data: { parameter: 'outbox', service: 'CurrentOutbox' } },
+        { ...error, data: { parameter: 'ledger', service: 'CurrentLedger' } },
+        { ...error, data: { parameter: 'journal', service: 'CurrentJournal' } },
+        { ...error, data: { parameter: 'tape', service: 'CurrentTape' } },
       ],
     },
     {

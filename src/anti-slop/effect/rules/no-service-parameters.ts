@@ -5,6 +5,7 @@ import {
   functionParameterTypeAnnotation,
 } from '../../shared/function-parameters.ts';
 import { baselineOption, fileBaseline, staleBaselineMessage } from '../baseline.ts';
+import { isFunction, returnedExpressions, unwrapNode } from '../shared/effect-modules.ts';
 
 /** Services callers may hand along, such as request-scoped context, from the `exempt` option. */
 function exemptServices(option: unknown): ReadonlySet<string> {
@@ -69,6 +70,14 @@ function typeQueryText(type: ESTree.TSType | undefined): string | undefined {
   return typeNameText(type.exprName);
 }
 
+/** `Schema.Schema.Type` for that member chain, or '' for anything else. */
+const memberText = (node: ESTree.Node): string =>
+  node.type === 'Identifier'
+    ? node.name
+    : node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier'
+      ? `${memberText(node.object)}.${node.property.name}`
+      : '';
+
 const propertyName = (node: ESTree.Node): string | undefined =>
   node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier'
     ? node.property.name
@@ -92,43 +101,57 @@ function serviceShape(node: ESTree.Class): ESTree.TSType | undefined {
   return undefined;
 }
 
-/** The identifier a call or member chain starts from, such as `Schema` in `Schema.Struct({})`. */
+/**
+ * The identifier a call or member chain starts from, such as `Schema` in
+ * `Schema.Struct({}) satisfies Schema.Schema<User>`.
+ */
 function chainRoot(node: ESTree.Node | null | undefined): string | undefined {
-  let current = node;
+  let current = node === null || node === undefined ? node : unwrapNode(node);
   while (current?.type === 'CallExpression' || current?.type === 'MemberExpression') {
-    current = current.type === 'CallExpression' ? current.callee : current.object;
+    current = unwrapNode(current.type === 'CallExpression' ? current.callee : current.object);
   }
   return current?.type === 'Identifier' ? current.name : undefined;
 }
 
 const EFFECT_ROOTS: ReadonlySet<string> = new Set(['Effect', 'Stream']);
 
-/** Whether a function is a generator or returns an Effect or a Stream. */
-const returnsEffect = (fn: ESTree.Node | null | undefined): boolean =>
-  (fn?.type === 'ArrowFunctionExpression' || fn?.type === 'FunctionExpression') &&
-  (fn.generator ||
-    (fn.returnType?.typeAnnotation.type === 'TSTypeReference' &&
-      OPERATION_TYPES.has(typeNameText(fn.returnType.typeAnnotation.typeName))) ||
-    (fn.body?.type === 'BlockStatement'
-      ? fn.body.body.some(
-          (statement) =>
-            statement.type === 'ReturnStatement' &&
-            EFFECT_ROOTS.has(chainRoot(statement.argument) ?? '')
-        )
-      : EFFECT_ROOTS.has(chainRoot(fn.body) ?? '')));
+/** A type annotation naming an Effect, a Stream or a state handle, or a function returning one. */
+const isOperationAnnotation = (type: ESTree.TSType | undefined): boolean =>
+  (type?.type === 'TSTypeReference' && OPERATION_TYPES.has(typeNameText(type.typeName))) ||
+  (type?.type === 'TSParenthesizedType' && isOperationAnnotation(type.typeAnnotation)) ||
+  (type?.type === 'TSFunctionType' && isOperationAnnotation(type.returnType.typeAnnotation));
 
-/** An instance method or field of a class that returns, holds or is typed as an Effect or Stream. */
+/** An expression that builds an Effect or a Stream, in either arm of a conditional. */
+const isEffectValue = (node: ESTree.Node | null | undefined): boolean => {
+  const value = node === null || node === undefined ? node : unwrapNode(node);
+  if (value?.type === 'ConditionalExpression') {
+    return isEffectValue(value.consequent) || isEffectValue(value.alternate);
+  }
+  return EFFECT_ROOTS.has(chainRoot(value) ?? '');
+};
+
+/** Whether a function is a generator, or is typed as or returns an Effect or a Stream. */
+const returnsEffect = (fn: ESTree.Node | null | undefined): boolean =>
+  isFunction(fn) &&
+  (fn.generator ||
+    isOperationAnnotation(fn.returnType?.typeAnnotation) ||
+    returnedExpressions(fn).some(isEffectValue));
+
+/** An instance method, getter or field of a class that returns, holds or is typed as an Effect or Stream. */
 function isClassOperation(member: ESTree.ClassElement): boolean {
   if (member.type === 'MethodDefinition') {
-    return member.kind === 'method' && !member.static && returnsEffect(member.value);
+    return (
+      member.kind !== 'constructor' &&
+      member.kind !== 'set' &&
+      !member.static &&
+      returnsEffect(member.value)
+    );
   }
   if (member.type !== 'PropertyDefinition' || member.static) return false;
-  const annotation = member.typeAnnotation?.typeAnnotation;
   return (
     returnsEffect(member.value) ||
-    EFFECT_ROOTS.has(chainRoot(member.value) ?? '') ||
-    (annotation?.type === 'TSTypeReference' &&
-      OPERATION_TYPES.has(typeNameText(annotation.typeName)))
+    isEffectValue(member.value) ||
+    isOperationAnnotation(member.typeAnnotation?.typeAnnotation)
   );
 }
 
@@ -167,15 +190,16 @@ function shapeKind(
 ): (type: ESTree.TSType) => ShapeKind {
   /** What `typeof X.Type` or `Schema.Schema.Type<typeof X>` holds, by what `X` is. */
   const schemaType = (query: string | undefined): ShapeKind => {
-    const schema = /^(\w+)(?:\.(?:Type|Encoded))?$/u.exec(query ?? '')?.[1] ?? '';
-    if (schemas.has(schema)) return 'data';
-    return importedData && imported.has(schema) ? 'data' : 'unknown';
+    // `User` for a local schema, or the import a name like `Models.User` starts from.
+    const [root = '', ...rest] = (query ?? '').replace(/\.(?:Type|Encoded)$/u, '').split('.');
+    if (rest.length === 0 && schemas.has(root)) return 'data';
+    return importedData && imported.has(root) ? 'data' : 'unknown';
   };
   const named = (name: string, seen: ReadonlySet<string>): ShapeKind => {
     const local = types.get(name);
     if (local !== undefined)
       return seen.has(name) ? 'unknown' : kind(local, new Set([...seen, name]));
-    if (schemas.has(name) && !types.has(name)) return 'data';
+    if (schemas.has(name)) return 'data';
     if (imported.has(name)) return importedData && !name.endsWith('Shape') ? 'data' : 'unknown';
     return 'unknown';
   };
@@ -195,9 +219,14 @@ function shapeKind(
       case 'TSInterfaceDeclaration':
         return combine([
           ...type.body.body.map((signature) => member(signature, seen)),
-          ...type.extends.map(({ expression }) =>
-            expression.type === 'Identifier' ? named(expression.name, seen) : 'unknown'
-          ),
+          ...type.extends.map(({ expression, typeArguments }) => {
+            if (expression.type === 'Identifier') return named(expression.name, seen);
+            // Effect 3's `interface Person extends Schema.Schema.Type<typeof Person> {}`.
+            const [argument] = typeArguments?.params ?? [];
+            return SCHEMA_DATA_TYPES.has(memberText(expression))
+              ? schemaType(typeQueryText(argument))
+              : 'unknown';
+          }),
         ]);
       case 'TSTypeAliasDeclaration':
       case 'TSParenthesizedType':
