@@ -66,6 +66,34 @@ test('docs on an inline $props() type stay', () => {
   assert.deepEqual(reportedLines(component), []);
 });
 
+test('docs on a props type alias, or an intersection with other props, stay', () => {
+  const component = `<script lang="ts">
+  import type { HTMLButtonAttributes } from 'svelte/elements';
+  type Props = {
+    /** The card's heading. */
+    title: string;
+  };
+  let { title, ...rest }: Props & HTMLButtonAttributes = $props();
+</script>
+`;
+  assert.deepEqual(reportedLines(component), []);
+});
+
+test('docs on props exported from the module script stay; oxlint reads each script on its own', () => {
+  const component = `<script lang="ts" module>
+  export interface Props {
+    /** The card's heading. */
+    title: string;
+  }
+</script>
+
+<script lang="ts">
+  let { title }: Props = $props();
+</script>
+`;
+  assert.deepEqual(reportedLines(component), []);
+});
+
 test("a component's script doc and docs on other types are reported", () => {
   const component = `<script lang="ts">
   interface Row {

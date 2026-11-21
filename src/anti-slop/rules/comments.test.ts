@@ -53,6 +53,7 @@ tester.run('anti-slop/comments', commentsRule, {
     '// The worker reads its files directly.\n// @effect-diagnostics-next-line nodeBuiltinImport:off\nimport * as Fs from "node:fs";',
     '// This module wraps Node.\n// @effect-diagnostics nodeBuiltinImport:off globalConsole:off\nimport * as Fs from "node:fs";',
     '// Generated from the schema.\n// @effect-diagnostics *:skip-file\nexport const a = 1;',
+    '// Wraps Node.\n// @effect-diagnostics nodeBuiltinImport:OFF\nimport * as Fs from "node:fs";',
     '// Read once on purpose.\n// svelte-ignore state_referenced_locally\nconst t = title;',
   ],
   invalid: [
@@ -104,6 +105,8 @@ tester.run('anti-slop/comments', commentsRule, {
     { code: 'const shader = // glsl\n  `void main() {}`;', errors: [{ messageId: 'untagged' }] },
     { code: '/* glsl */ const a = 1;', errors: [{ messageId: 'untagged' }] },
     { code: 'const shader = /* glsl */ glsl`void main() {}`;', errors: [{ messageId: 'untagged' }] },
+    { code: 'const shader = String.raw /* glsl */ `void main() {}`;', errors: [{ messageId: 'untagged' }] },
+    { code: 'const shader = /* scratch */ /* glsl */ `void main() {}`;', errors: [{ messageId: 'untagged' }] },
     // Prose that starts with a tool's name is not a directive.
     { code: '// eslint config: the base preset sets these.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
     // A directive ends a comment, so a tagged line above it can't carry the line below.
@@ -114,6 +117,10 @@ tester.run('anti-slop/comments', commentsRule, {
     // An Effect directive that turns a check up suppresses nothing.
     {
       code: '// The loop must not leak.\n// @effect-diagnostics floatingEffect:error\nconst a = 1;',
+      errors: [{ messageId: 'untagged' }],
+    },
+    {
+      code: '// Wraps Node.\n// @effect-diagnostics nodeBuiltinImport:off-label\nconst a = 1;',
       errors: [{ messageId: 'untagged' }],
     },
     // A trailing comment is not a reason, and a trailing directive doesn't carry one down.

@@ -12,7 +12,7 @@ const DIRECTIVE =
 const LICENSE = /@license\b|\bSPDX-License-Identifier\b/u;
 const COPYRIGHT = /\bcopyright\b/iu;
 const SUPPRESSION =
-  /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics(?:-next-line)?\s.*:(?:off|skip-file)\b|svelte-ignore\b)/u;
+  /^\s*\*?\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|@effect-diagnostics(?:-next-line)?\s.*:(?:off|skip-file)(?![\w-])|svelte-ignore\b)/iu;
 /** A one-word block comment before a template literal, such as `glsl`, that tells editors how to highlight it. */
 const LANGUAGE_HINT = /^\s*[a-z][\w-]*\s*$/iu;
 const isDoc = (comment: Comment): boolean =>
@@ -133,6 +133,15 @@ function svelteProps(program: ESTree.Program, filename: string): readonly ESTree
       types.set(statement.id.name, statement);
   }
   const props: ESTree.Node[] = [];
+  /** A literal or local type, or each part of an intersection such as `Props & HTMLButtonAttributes`. */
+  const addProps = (type: ESTree.TSType): void => {
+    if (type.type === 'TSTypeLiteral') props.push(type);
+    if (type.type === 'TSIntersectionType') type.types.forEach(addProps);
+    if (type.type === 'TSTypeReference' && type.typeName.type === 'Identifier') {
+      const declaration = types.get(type.typeName.name);
+      if (declaration !== undefined) props.push(declaration);
+    }
+  };
   for (const statement of program.body) {
     if (statement.type !== 'VariableDeclaration') continue;
     for (const { id, init } of statement.declarations) {
@@ -140,13 +149,8 @@ function svelteProps(program: ESTree.Program, filename: string): readonly ESTree
         init?.type === 'CallExpression' &&
         init.callee.type === 'Identifier' &&
         init.callee.name === '$props';
-      const type = id.typeAnnotation?.typeAnnotation;
-      if (!callsProps || type === undefined) continue;
-      if (type.type === 'TSTypeLiteral') props.push(type);
-      if (type.type === 'TSTypeReference' && type.typeName.type === 'Identifier') {
-        const declaration = types.get(type.typeName.name);
-        if (declaration !== undefined) props.push(declaration);
-      }
+      const annotation = id.typeAnnotation?.typeAnnotation;
+      if (callsProps && annotation !== undefined) addProps(annotation);
     }
   }
   return props;
@@ -284,7 +288,7 @@ export const commentsRule = defineRule({
       MethodDefinition: collect,
       Property: collect,
       TemplateLiteral(node) {
-        templates.add(node.start);
+        if (node.parent?.type !== 'TaggedTemplateExpression') templates.add(node.start);
       },
       TSUnionType(node) {
         members.push(...node.types);
@@ -322,7 +326,7 @@ export const commentsRule = defineRule({
             first.type === 'Block' &&
             !isDoc(first) &&
             LANGUAGE_HINT.test(first.value) &&
-            templates.has(sourceCode.getTokenAfter(first)?.start ?? -1);
+            templates.has(sourceCode.getTokenAfter(first, { includeComments: true })?.start ?? -1);
           if (languageHint) continue;
           const kind = exportDocs.has(first.start)
             ? 'exportDoc'
