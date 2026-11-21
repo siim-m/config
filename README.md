@@ -89,15 +89,16 @@ such as request context, in `exempt`.
 
 ## Tests and shortcuts
 
-Ten rules from two npm packages report tests that pass whatever the code does or lean on time, and
+Nine rules from two npm packages report tests that pass whatever the code does or lean on time, and
 other shortcuts agents take:
 
 - From [eslint-plugin-ai-guard](https://github.com/ai-guard-dev/eslint-plugin-ai-guard):
-  `no-assertionless-test`, `no-tautological-assertion`, `no-placeholder-implementation`,
-  `no-test-env-branch`, `no-silent-fallback` and `no-undeclared-import`. Its test detection doesn't
-  know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and typescript-eslint,
-  which ask for TypeScript 6 as a peer; npm nests a copy under this package when the project has
-  TypeScript 7.
+  `no-tautological-assertion`, `no-placeholder-implementation`, `no-test-env-branch`,
+  `no-silent-fallback` and `no-undeclared-import`. Its `no-assertionless-test` stays off: it can't
+  see an assertion helper imported from another file, so it reports tests that do assert. Its test
+  detection doesn't know Effect's `it.effect`, so those tests go unchecked. It brings `eslint` and
+  typescript-eslint, which ask for TypeScript 6 as a peer; npm nests a copy under this package when
+  the project has TypeScript 7.
 - From [landmines](https://github.com/interfere-inc/landmines): `no-fixed-sleep`,
   `no-flake-masking`, `no-unsignaled-poll` and `strict-msw`. All four take an
   `allow: { "<file>": <count> }` option for adopting them file by file.

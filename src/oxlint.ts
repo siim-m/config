@@ -47,7 +47,6 @@ const preset = {
     'anti-slop-effect/prefer-effect-match': 'error',
     'anti-slop-effect/require-cause-when-narrowing': 'error',
     'anti-slop-effect/throw-in-effect-gen': 'error',
-    'ai-guard/no-assertionless-test': 'error',
     'ai-guard/no-placeholder-implementation': 'error',
     'ai-guard/no-silent-fallback': 'error',
     'ai-guard/no-tautological-assertion': 'error',

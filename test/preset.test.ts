@@ -65,12 +65,11 @@ test('the oxlint preset reports tests that cannot fail or lean on time', () => {
   ]);
 
   assert.equal(status, 1, output);
-  // The first test asserts on a result, so it passes; each other test trips one rule, and the
-  // last trips two.
+  // The first test asserts on a result and the third asserts nothing; both pass, since the preset
+  // leaves ai-guard's no-assertionless-test off. The second trips one rule and the last trips two.
   assert.deepEqual(
     reportedRules(output).get('test/fixture/honesty.test.ts'),
     [
-      'ai-guard(no-assertionless-test)',
       'ai-guard(no-tautological-assertion)',
       'landmines(no-fixed-sleep)',
       'landmines(no-flake-masking)',
