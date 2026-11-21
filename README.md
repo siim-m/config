@@ -80,9 +80,10 @@ config that still names the old rule, so rename or remove it there.
 `(mailer: MailerShape, to: string) => mailer.send(to)`. Get the service from context where the
 caller is built instead. A function may still take a service's shape when the file shows it's plain
 data, such as a signed-in user built from `Schema.Struct` or `Schema.Class`, with no methods or
-members typed as functions, Effects, Streams or Refs. A shape the rule can't see into, such as
-`Effect.Success<typeof make>`, stays a service, and an imported shape counts when it's named
-`…Shape`. List services that callers may pass along anyway, such as request context, in `exempt`.
+members that are or return Effects, Streams or Refs. A shape the rule can't see into, such as
+`Effect.Success<typeof make>`, stays a service, and a parameter typed by an imported name counts
+only when the name ends in `Shape`. List services that callers may pass along anyway, such as
+request context, in `exempt`.
 
 ## Tests and shortcuts
 

@@ -63,6 +63,15 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
     class CurrentPerson extends Context.Service<CurrentPerson, Person>()('CurrentPerson') {}
     const isGuest = (person: Person) => person.email === null;
     const audit = (person: CurrentPerson['Service']) => person.id;`,
+    // A data class's own helpers compute over its fields; they aren't operations.
+    `class Account extends Schema.Class<Account>('Account')({ role: Schema.String }) {
+      isAdmin() { return this.role === 'admin'; }
+    }
+    class CurrentAccount extends Context.Service<CurrentAccount, Account>()('CurrentAccount') {}
+    const canEdit = (account: Account) => account.isAdmin();`,
+    // Picking part of a service, as a narrow dependency or a test's overrides, is left alone.
+    `import type { MailerShape } from './mailer';
+    const notify = (mailer: Pick<MailerShape, 'send'>, overrides: Partial<MailerShape>) => mailer.send();`,
     // A generic shape names no type of its own.
     `class Settings extends Context.Service<Settings, Record<string, string>>()('Settings') {}
     const tally = (counts: Record<string, number>) => counts;`,
@@ -176,14 +185,38 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       class Account extends Schema.Class<Account>('Account')({ id: Schema.String }) {
         send() { return Effect.log(this.id); }
       }
+      class Outbox extends Schema.Class<Outbox>('Outbox')({ id: Schema.String }) {
+        readonly flush = () => Effect.void;
+      }
+      class CurrentOutbox extends Context.Service<CurrentOutbox, Outbox>()('app/CurrentOutbox') {}
       class Hooks extends Context.Service<Hooks, HooksShape>()('app/Hooks') {}
       class Counter extends Context.Service<Counter, CounterShape>()('app/Counter') {}
       class CurrentAccount extends Context.Service<CurrentAccount, Account>()('app/CurrentAccount') {}
-      const run = (hooks: HooksShape, counter: CounterShape, account: Account) => account.send();`,
+      const run = (hooks: HooksShape, counter: CounterShape, account: Account, outbox: Outbox) =>
+        account.send();`,
       errors: [
         { ...error, data: { parameter: 'hooks', service: 'Hooks' } },
         { ...error, data: { parameter: 'counter', service: 'Counter' } },
         { ...error, data: { parameter: 'account', service: 'CurrentAccount' } },
+        { ...error, data: { parameter: 'outbox', service: 'CurrentOutbox' } },
+      ],
+    },
+    {
+      // A generic local shape, a `.Type` of something that isn't a schema, and a local `…Shape`
+      // built on an import are all still services.
+      code: `import type { BaseApi } from './base';
+      interface MailerApi<A> { send(to: A): Effect.Effect<void> }
+      class Mailer extends Context.Service<Mailer, MailerApi<string>>()('app/Mailer') {}
+      const live = makeLive();
+      type LiveApi = typeof live.Type;
+      class Live extends Context.Service<Live, LiveApi>()('app/Live') {}
+      interface StoreShape extends BaseApi {}
+      class Store extends Context.Service<Store, StoreShape>()('app/Store') {}
+      const run = (mailer: MailerApi<string>, api: LiveApi, store: StoreShape) => mailer.send('a');`,
+      errors: [
+        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
+        { ...error, data: { parameter: 'api', service: 'Live' } },
+        { ...error, data: { parameter: 'store', service: 'Store' } },
       ],
     },
     {
@@ -194,13 +227,10 @@ tester.run('anti-slop-effect/no-service-parameters', noServiceParametersRule, {
       errors: [{ ...error, data: { parameter: 'both', service: 'Mailer' } }],
     },
     {
-      // Part of a service is still the service.
+      // A service joined with another type is still the service.
       code: `import type { MailerShape } from './mailer';
-      const notify = (mailer: Pick<MailerShape, 'send'>, audit: MailerShape & Audited) => mailer.send();`,
-      errors: [
-        { ...error, data: { parameter: 'mailer', service: 'Mailer' } },
-        { ...error, data: { parameter: 'audit', service: 'Mailer' } },
-      ],
+      const notify = (audit: MailerShape & Audited) => audit.send();`,
+      errors: [{ ...error, data: { parameter: 'audit', service: 'Mailer' } }],
     },
     {
       ...baselined,

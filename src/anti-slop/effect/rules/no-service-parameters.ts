@@ -30,7 +30,7 @@ interface TypeDeclarations {
 }
 type FunctionNode = ESTree.Function | ESTree.ArrowFunctionExpression;
 
-/** Wrappers whose result is still part of the type they take, such as `Pick<MailerShape, 'send'>`. */
+/** Wrappers that hold what their type argument holds, when reading a shape such as `Pick<SmsShape, 'send'>`. */
 const PART_OF: ReadonlySet<string> = new Set(['Pick', 'Omit', 'Partial', 'Required', 'Readonly']);
 /** Member types that make a shape a set of operations rather than data: effects and state handles. */
 const OPERATION_TYPES: ReadonlySet<string> = new Set([
@@ -92,15 +92,55 @@ function serviceShape(node: ESTree.Class): ESTree.TSType | undefined {
   return undefined;
 }
 
-/** A `Schema.Class` or `Data.Class` with no methods of its own. */
+/** The identifier a call or member chain starts from, such as `Schema` in `Schema.Struct({})`. */
+function chainRoot(node: ESTree.Node | null | undefined): string | undefined {
+  let current = node;
+  while (current?.type === 'CallExpression' || current?.type === 'MemberExpression') {
+    current = current.type === 'CallExpression' ? current.callee : current.object;
+  }
+  return current?.type === 'Identifier' ? current.name : undefined;
+}
+
+const EFFECT_ROOTS: ReadonlySet<string> = new Set(['Effect', 'Stream']);
+
+/** Whether a function is a generator or returns an Effect or a Stream. */
+const returnsEffect = (fn: ESTree.Node | null | undefined): boolean =>
+  (fn?.type === 'ArrowFunctionExpression' || fn?.type === 'FunctionExpression') &&
+  (fn.generator ||
+    (fn.returnType?.typeAnnotation.type === 'TSTypeReference' &&
+      OPERATION_TYPES.has(typeNameText(fn.returnType.typeAnnotation.typeName))) ||
+    (fn.body?.type === 'BlockStatement'
+      ? fn.body.body.some(
+          (statement) =>
+            statement.type === 'ReturnStatement' &&
+            EFFECT_ROOTS.has(chainRoot(statement.argument) ?? '')
+        )
+      : EFFECT_ROOTS.has(chainRoot(fn.body) ?? '')));
+
+/** An instance method or field of a class that returns, holds or is typed as an Effect or Stream. */
+function isClassOperation(member: ESTree.ClassElement): boolean {
+  if (member.type === 'MethodDefinition') {
+    return member.kind === 'method' && !member.static && returnsEffect(member.value);
+  }
+  if (member.type !== 'PropertyDefinition' || member.static) return false;
+  const annotation = member.typeAnnotation?.typeAnnotation;
+  return (
+    returnsEffect(member.value) ||
+    EFFECT_ROOTS.has(chainRoot(member.value) ?? '') ||
+    (annotation?.type === 'TSTypeReference' &&
+      OPERATION_TYPES.has(typeNameText(annotation.typeName)))
+  );
+}
+
+/**
+ * A `Schema.Class` or `Data.Class` with no operations of its own; helpers that compute over its
+ * fields, such as `isAdmin()`, are still data.
+ */
 function isDataClass(node: ESTree.Class): boolean {
   let callee = node.superClass;
   while (callee?.type === 'CallExpression') callee = callee.callee;
-  const hasMethods = node.body.body.some(
-    (member) => member.type === 'MethodDefinition' && member.kind === 'method' && !member.static
-  );
   return (
-    !hasMethods &&
+    !node.body.body.some(isClassOperation) &&
     callee?.type === 'MemberExpression' &&
     callee.object.type === 'Identifier' &&
     DATA_CLASS_MODULES.has(callee.object.name) &&
@@ -120,15 +160,22 @@ const combine = (kinds: readonly ShapeKind[]): ShapeKind =>
  */
 function shapeKind(
   types: ReadonlyMap<string, LocalType>,
-  dataClasses: ReadonlySet<string>,
+  /** Local schemas and data classes, whose `Type` is data. */
+  schemas: ReadonlySet<string>,
   imported: ReadonlySet<string>,
   importedData: boolean
 ): (type: ESTree.TSType) => ShapeKind {
+  /** What `typeof X.Type` or `Schema.Schema.Type<typeof X>` holds, by what `X` is. */
+  const schemaType = (query: string | undefined): ShapeKind => {
+    const schema = /^(\w+)(?:\.(?:Type|Encoded))?$/u.exec(query ?? '')?.[1] ?? '';
+    if (schemas.has(schema)) return 'data';
+    return importedData && imported.has(schema) ? 'data' : 'unknown';
+  };
   const named = (name: string, seen: ReadonlySet<string>): ShapeKind => {
     const local = types.get(name);
     if (local !== undefined)
       return seen.has(name) ? 'unknown' : kind(local, new Set([...seen, name]));
-    if (dataClasses.has(name)) return 'data';
+    if (schemas.has(name) && !types.has(name)) return 'data';
     if (imported.has(name)) return importedData && !name.endsWith('Shape') ? 'data' : 'unknown';
     return 'unknown';
   };
@@ -162,14 +209,16 @@ function shapeKind(
       case 'TSUnionType':
       case 'TSIntersectionType':
         return combine(type.types.map((part) => kind(part, seen)));
-      case 'TSTypeQuery':
+      case 'TSTypeQuery': {
         // `typeof User.Type`: the data a schema decodes to.
-        return /\.(?:Type|Encoded)$/u.test(typeQueryText(type) ?? '') ? 'data' : 'unknown';
+        const query = typeQueryText(type) ?? '';
+        return /\.(?:Type|Encoded)$/u.test(query) ? schemaType(query) : 'unknown';
+      }
       case 'TSTypeReference': {
         const name = typeNameText(type.typeName);
         if (OPERATION_TYPES.has(name)) return 'operations';
-        if (SCHEMA_DATA_TYPES.has(name)) return 'data';
         const [argument] = type.typeArguments?.params ?? [];
+        if (SCHEMA_DATA_TYPES.has(name)) return schemaType(typeQueryText(argument));
         if (PART_OF.has(name) && argument !== undefined) return kind(argument, seen);
         return type.typeName.type === 'Identifier' ? named(name, seen) : 'unknown';
       }
@@ -184,6 +233,7 @@ function collectTypeDeclarations(program: ESTree.Program): TypeDeclarations {
   const types = new Map<string, LocalType>();
   const imported = new Set<string>();
   const classes: ESTree.Class[] = [];
+  const constants: ESTree.VariableDeclarator[] = [];
   for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
       for (const specifier of statement.specifiers) imported.add(specifier.local.name);
@@ -200,26 +250,29 @@ function collectTypeDeclarations(program: ESTree.Program): TypeDeclarations {
       types.set(declaration.id.name, declaration);
     }
     if (declaration?.type === 'ClassDeclaration') classes.push(declaration);
+    if (declaration?.type === 'VariableDeclaration') constants.push(...declaration.declarations);
   }
-  const dataClasses = new Set(
-    classes.flatMap((node) => (node.id !== null && isDataClass(node) ? [node.id.name] : []))
-  );
-  const parameterKind = shapeKind(types, dataClasses, imported, true);
-  const instanceKind = shapeKind(types, dataClasses, imported, false);
+  const schemas = new Set([
+    ...classes.flatMap((node) => (node.id !== null && isDataClass(node) ? [node.id.name] : [])),
+    ...constants.flatMap(({ id, init }) =>
+      id.type === 'Identifier' && chainRoot(init) === 'Schema' ? [id.name] : []
+    ),
+  ]);
+  const parameterKind = shapeKind(types, schemas, imported, true);
+  const instanceKind = shapeKind(types, schemas, imported, false);
   const shapes = new Map<string, string>();
   const dataServices = new Set<string>();
   for (const node of classes) {
     const shape = serviceShape(node);
     if (shape === undefined || node.id === null) continue;
     if (instanceKind(shape) === 'data') dataServices.add(node.id.name);
-    // A parameter typed by the shape's own name, such as `Person`, unless the shape is generic.
-    const named =
-      shape.type === 'TSTypeReference' &&
-      shape.typeName.type === 'Identifier' &&
-      shape.typeArguments === null;
-    if (named && parameterKind(shape) !== 'data') {
-      shapes.set(typeNameText(shape.typeName), node.id.name);
-    }
+    // A parameter typed by the shape's own name, such as `Person`, unless that name is a generic
+    // the file doesn't declare, such as `Record`. A local `…Shape` is read like the instance.
+    if (shape.type !== 'TSTypeReference' || shape.typeName.type !== 'Identifier') continue;
+    const name = shape.typeName.name;
+    if (shape.typeArguments !== null && !types.has(name)) continue;
+    const kind = name.endsWith('Shape') ? instanceKind(shape) : parameterKind(shape);
+    if (kind !== 'data') shapes.set(name, node.id.name);
   }
   return { types, shapes, dataServices, imported };
 }
@@ -268,9 +321,6 @@ function serviceOfType(
         // `Effect.Success<typeof Tag>` or `Effect.Success<typeof Tag.make>`
         const query = typeQueryText(argument)?.replace(/\.make$/u, '');
         return query !== undefined && /^[A-Z]\w*$/u.test(query) ? accept(query) : undefined;
-      }
-      if (PART_OF.has(name) && argument !== undefined) {
-        return serviceOfType(argument, declarations, exempt, seen);
       }
       if (type.typeName.type !== 'Identifier' || seen.has(name)) return undefined;
       const service = declarations.shapes.get(name);
