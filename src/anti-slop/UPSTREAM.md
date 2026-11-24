@@ -12,9 +12,19 @@ skips this directory, so a later diff against upstream shows only real changes.
 | `rules/no-array-filter-map.ts`                   | Its fix makes code longer, and upstream doesn't claim it's faster. |
 | `effect/rules/no-manual-tag-comparison.ts`       | Flags every `_tag` comparison; too broad to turn on.                |
 | `effect/rules/no-manual-tagged-construction.ts`  | Flags every object literal with a `_tag`; too broad to turn on.     |
+| `effect/rules/no-manual-effect-error-tag.ts`     | `@effect/tsgo` covers it; see below.                                |
 
-Their tests went with them. `shared/array-method.ts` and `effect/shared/tagged-values.ts` stay:
-`no-reduce-accumulator-copy` and `no-manual-effect-error-tag` use them.
+Their tests went with them, as did `effect/shared/tagged-values.ts`, which only they used.
+`shared/array-method.ts` stays: `no-reduce-accumulator-copy` uses it.
+
+`no-manual-effect-error-tag` flagged any `_tag` check inside a broad Effect catch handler. The
+tsgo diagnostics `tsconfig.base.json` turns on report the cases worth rewriting:
+`catchAllTagDispatchToCatchTag` (a catch-all that branches on `_tag` and re-fails the rest),
+`catchIfTagToCatchTag` (`catchIf` on a bare `_tag` equality), `catchTagToCatchReason` (the same for
+`reason._tag`) and `catchConditionalRefailToCatchIf`. What only the oxlint rule caught were handlers
+that combine a tag with another condition, such as
+`catchIf((e) => e._tag === 'DBError' && isSerializationFailure(e.cause), ...)`, or that map every
+error to an outcome by its tag. `catchTag` makes neither shorter.
 
 ## Added
 
