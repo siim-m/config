@@ -18,13 +18,14 @@ Their tests went with them, as did `effect/shared/tagged-values.ts`, which only 
 `shared/array-method.ts` stays: `no-reduce-accumulator-copy` uses it.
 
 `no-manual-effect-error-tag` flagged any `_tag` check inside a broad Effect catch handler. The
-tsgo diagnostics `tsconfig.base.json` turns on report the cases worth rewriting:
+tsgo diagnostics `tsconfig.base.json` turns on report the common rewrites:
 `catchAllTagDispatchToCatchTag` (a catch-all that branches on `_tag` and re-fails the rest),
-`catchIfTagToCatchTag` (`catchIf` on a bare `_tag` equality), `catchTagToCatchReason` (the same for
-`reason._tag`) and `catchConditionalRefailToCatchIf`. What only the oxlint rule caught were handlers
-that combine a tag with another condition, such as
+`catchIfTagToCatchTag` (`catchIf` on a bare `_tag` equality), `catchTagToCatchReason` (branching on
+`reason._tag` inside `catchTag`) and `catchConditionalRefailToCatchIf`. The rule went because of
+false positives: handlers that combine a tag with another condition, such as
 `catchIf((e) => e._tag === 'DBError' && isSerializationFailure(e.cause), ...)`, or that map every
-error to an outcome by its tag. `catchTag` makes neither shorter.
+error to an outcome by its tag, which `catchTag` makes no shorter. Nothing reports a catch-all that
+branches on `reason._tag` any more; `catchReasons` is the rewrite for it.
 
 ## Added
 
