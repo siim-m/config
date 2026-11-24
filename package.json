@@ -1,6 +1,6 @@
 {
   "name": "@siim-m/config",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Shared oxlint, oxfmt and tsconfig settings, with the anti-slop oxlint plugins and a React preset",
   "license": "MIT",
   "repository": "github:siim-m/config",
