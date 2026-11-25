@@ -208,6 +208,12 @@ function isExposedMember(member: ESTree.Node, exported: ReadonlySet<ESTree.Node>
   }
 }
 
+const PREFIX_MEANINGS: Readonly<Record<string, string>> = {
+  SAFETY: 'why an unchecked step such as a type assertion holds',
+  SYNC: 'the other place or outside system this code must stay in step with',
+  WARNING: 'a trap the next change could fall into',
+};
+
 /**
  * Keep only comments that carry what the code can't: directives, licence headers, docs on exports,
  * the reason above a suppression and comments that start with an allowed prefix such as `SAFETY:`.
@@ -240,7 +246,7 @@ export const commentsRule = defineRule({
     ],
     messages: {
       untagged:
-        'Remove this comment: put the meaning in names and the rationale in the PR. Comments that start with {{prefixes}}, directives, docs on exports and the reason above a suppression stay.',
+        "Remove this comment: put the meaning in names and the rationale in the PR. Directives, docs on exports, the reason above a suppression and comments that start with one of these prefixes stay: {{prefixes}}. Adding a prefix that doesn't fit is not a fix.",
       multiLine: 'Keep this comment to one line. Leave the history to git and the PR.',
       multiLineDoc:
         'Keep this doc to one line. A file whose exports need longer docs sets `multilineExportDocs` in an override.',
@@ -255,7 +261,12 @@ export const commentsRule = defineRule({
       options.allow.some(
         (prefix) => line.startsWith(`${prefix}:`) && line.slice(prefix.length + 1).trim() !== ''
       );
-    const prefixes = options.allow.map((prefix) => `\`${prefix}:\``).join(', ');
+    const prefixes = options.allow
+      .map((prefix) => {
+        const meaning = PREFIX_MEANINGS[prefix];
+        return meaning === undefined ? `\`${prefix}:\`` : `\`${prefix}:\` ${meaning}`;
+      })
+      .join('; ');
     const members: ESTree.Node[] = [];
     const templates = new Set<number>();
     const collect = (node: ESTree.Node) => {

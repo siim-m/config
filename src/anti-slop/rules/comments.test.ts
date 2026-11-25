@@ -61,6 +61,26 @@ tester.run('anti-slop/comments', commentsRule, {
     { code: '// Because the API truncates.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
     { code: '/** Loads one row. */\nfunction load() {}', errors: [{ messageId: 'untagged' }] },
     { code: '// TODO(#12): drop the shim.\nconst a = 1;', errors: [{ messageId: 'untagged' }] },
+    // The message says what each default prefix is for and lists a custom one by name.
+    {
+      code: '// The plan and the 3D view share these colours.\nconst a = 1;',
+      errors: [
+        {
+          message:
+            "Remove this comment: put the meaning in names and the rationale in the PR. Directives, docs on exports, the reason above a suppression and comments that start with one of these prefixes stay: `SAFETY:` why an unchecked step such as a type assertion holds; `SYNC:` the other place or outside system this code must stay in step with; `WARNING:` a trap the next change could fall into. Adding a prefix that doesn't fit is not a fix.",
+        },
+      ],
+    },
+    {
+      code: '// The plan and the 3D view share these colours.\nconst a = 1;',
+      options: [{ allow: ['SYNC', 'NOTE'] }],
+      errors: [
+        {
+          message:
+            "Remove this comment: put the meaning in names and the rationale in the PR. Directives, docs on exports, the reason above a suppression and comments that start with one of these prefixes stay: `SYNC:` the other place or outside system this code must stay in step with; `NOTE:`. Adding a prefix that doesn't fit is not a fix.",
+        },
+      ],
+    },
     {
       code: 'interface Row {\n  /** Seconds since the epoch. */\n  readonly at: number;\n}',
       errors: [{ messageId: 'untagged' }],
