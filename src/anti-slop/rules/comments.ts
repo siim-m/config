@@ -208,11 +208,14 @@ function isExposedMember(member: ESTree.Node, exported: ReadonlySet<ESTree.Node>
   }
 }
 
-const PREFIX_MEANINGS: Readonly<Record<string, string>> = {
-  SAFETY: 'why an unchecked step such as a type assertion holds',
-  SYNC: 'the other place or outside system this code must stay in step with',
-  WARNING: 'a trap the next change could fall into',
-};
+const DEFAULT_PREFIXES: ReadonlyMap<string, string> = new Map([
+  ['SAFETY', 'why an unchecked step such as a type assertion holds'],
+  [
+    'SYNC',
+    'what this keeps in step with elsewhere and why, such as an outside system an effect drives or a value copied from another place',
+  ],
+  ['WARNING', 'a trap the next change could fall into'],
+]);
 
 /**
  * Keep only comments that carry what the code can't: directives, licence headers, docs on exports,
@@ -241,7 +244,7 @@ export const commentsRule = defineRule({
       {
         maxWords: 30,
         multilineExportDocs: false,
-        allow: ['SAFETY', 'SYNC', 'WARNING'],
+        allow: [...DEFAULT_PREFIXES.keys()],
       },
     ],
     messages: {
@@ -263,7 +266,7 @@ export const commentsRule = defineRule({
       );
     const prefixes = options.allow
       .map((prefix) => {
-        const meaning = PREFIX_MEANINGS[prefix];
+        const meaning = DEFAULT_PREFIXES.get(prefix);
         return meaning === undefined ? `\`${prefix}:\`` : `\`${prefix}:\` ${meaning}`;
       })
       .join('; ');

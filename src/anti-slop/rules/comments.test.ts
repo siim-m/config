@@ -67,17 +67,19 @@ tester.run('anti-slop/comments', commentsRule, {
       errors: [
         {
           message:
-            "Remove this comment: put the meaning in names and the rationale in the PR. Directives, docs on exports, the reason above a suppression and comments that start with one of these prefixes stay: `SAFETY:` why an unchecked step such as a type assertion holds; `SYNC:` the other place or outside system this code must stay in step with; `WARNING:` a trap the next change could fall into. Adding a prefix that doesn't fit is not a fix.",
+            "Remove this comment: put the meaning in names and the rationale in the PR. Directives, docs on exports, the reason above a suppression and comments that start with one of these prefixes stay: `SAFETY:` why an unchecked step such as a type assertion holds; `SYNC:` what this keeps in step with elsewhere and why, such as an outside system an effect drives or a value copied from another place; `WARNING:` a trap the next change could fall into. Adding a prefix that doesn't fit is not a fix.",
         },
       ],
     },
     {
       code: '// The plan and the 3D view share these colours.\nconst a = 1;',
-      options: [{ allow: ['SYNC', 'NOTE'] }],
+      options: [{ allow: ['WARNING', 'NOTE', 'constructor'] }],
       errors: [
         {
-          message:
-            "Remove this comment: put the meaning in names and the rationale in the PR. Directives, docs on exports, the reason above a suppression and comments that start with one of these prefixes stay: `SYNC:` the other place or outside system this code must stay in step with; `NOTE:`. Adding a prefix that doesn't fit is not a fix.",
+          messageId: 'untagged',
+          data: {
+            prefixes: '`WARNING:` a trap the next change could fall into; `NOTE:`; `constructor:`',
+          },
         },
       ],
     },
